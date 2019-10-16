@@ -1,3 +1,5 @@
+// Copyright © 2019 Arrikto Inc.  All Rights Reserved.
+
 package e2e
 
 import (

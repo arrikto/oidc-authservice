@@ -1,7 +1,11 @@
+// Copyright (c) 2018 Antti Myyrä
+// Copyright © 2019 Arrikto Inc.  All Rights Reserved.
+
 package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -66,4 +70,14 @@ func clean(s []string) []string {
 		}
 	}
 	return res
+}
+
+func createNonce(length int) string {
+	nonceChars := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	var nonce = make([]rune, length)
+	for i := range nonce {
+		nonce[i] = nonceChars[rand.Intn(len(nonceChars))]
+	}
+
+	return string(nonce)
 }
