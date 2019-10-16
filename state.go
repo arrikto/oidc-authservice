@@ -1,9 +1,10 @@
+// Copyright © 2019 Arrikto Inc.  All Rights Reserved.
+
 package main
 
 import (
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -63,14 +64,4 @@ func (s *state) save(store sessions.Store) (string, error) {
 		return "", errors.Wrap(err, "error trying to save session")
 	}
 	return c.Value, nil
-}
-
-func createNonce(length int) string {
-	nonceChars := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-	var nonce = make([]rune, length)
-	for i := range nonce {
-		nonce[i] = nonceChars[rand.Intn(len(nonceChars))]
-	}
-
-	return string(nonce)
 }

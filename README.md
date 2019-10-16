@@ -1,6 +1,6 @@
 # OIDC AuthService
 
-This is a rewrite of the [ambassador-oidc-authservice](https://github.com/ajmyyra/ambassador-auth-oidc) project.
+This is a rewrite of the [ajmyyra/ambassador-auth-oidc](https://github.com/ajmyyra/ambassador-auth-oidc) project.
 
 An AuthService is an HTTP Server that an API Gateway (eg Ambassador, Envoy) asks if an incoming request is authorized.
 
