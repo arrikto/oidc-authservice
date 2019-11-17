@@ -28,7 +28,8 @@ Following environment variables are used by the software.
 * **CLIENT_SECRET** Client secret for your application.
 
 **Optional**
-* **PORT** Port to listen for requests. Default is 8080.
+* **SERVER_HOSTNAME** Hostname to listen for requests. Defaults to all IPv4/6 interfaces (0.0.0.0, ::).
+* **SERVER_PORT** Port to listen for requests. Default is 8080.
 * **SKIP_AUTH_URI** Space separated whitelist of URIs like "/info /health" to bypass authorization. Contains nothing by default.
 
 OIDC-AuthService stores sessions and other state in a local file using BoltDB.
