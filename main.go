@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 	log "github.com/sirupsen/logrus"
+	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/reaper"
 	"github.com/yosssi/boltstore/store"
 	"golang.org/x/oauth2"
@@ -15,7 +16,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 )
 
@@ -38,7 +38,6 @@ type server struct {
 	provider             *oidc.Provider
 	oauth2Config         *oauth2.Config
 	store                sessions.Store
-	whitelist            []string
 	staticDestination    string
 	sessionMaxAgeSeconds int
 	userIDOpts
@@ -55,8 +54,7 @@ func main() {
 
 	// Start readiness probe immediately
 	log.Infof("Starting readiness probe at %v", defaultHealthServerPort)
-	isReady := &atomic.Value{}
-	isReady.Store(false)
+	isReady := abool.New()
 	go func() {
 		log.Fatal(http.ListenAndServe(":"+defaultHealthServerPort, http.HandlerFunc(readiness(isReady))))
 	}()
@@ -87,6 +85,30 @@ func main() {
 	storePath := getEnvOrDie("STORE_PATH")
 	// Sessions
 	sessionMaxAge := getEnvOrDefault("SESSION_MAX_AGE", defaultSessionMaxAge)
+
+	/////////////////////////////////////////////////////
+	// Start server immediately for whitelisted routes //
+	/////////////////////////////////////////////////////
+
+	s := &server{}
+
+	// Register handlers for routes
+	router := mux.NewRouter()
+	router.HandleFunc("/login/oidc", s.callback).Methods(http.MethodGet)
+	router.HandleFunc("/logout", s.logout).Methods(http.MethodGet)
+	router.PathPrefix("/").HandlerFunc(s.authenticate)
+
+	// Start server
+	log.Infof("Starting web server at %v:%v", hostname, port)
+	stopCh := make(chan struct{})
+	go func(stopCh chan struct{}) {
+		log.Fatal(http.ListenAndServe(hostname+":"+port, handlers.CORS()(whitelistMiddleware(whitelist, isReady)(router))))
+		close(stopCh)
+	}(stopCh)
+
+	/////////////////////////////////
+	// Resume setup asynchronously //
+	/////////////////////////////////
 
 	// OIDC Discovery
 	var provider *oidc.Provider
@@ -127,7 +149,10 @@ func main() {
 		log.Fatalf("Couldn't convert session MaxAge to int: %v", err)
 	}
 
-	s := &server{
+	// Set the server values.
+	// The isReady atomic variable should protect it from concurrency issues.
+
+	*s = server{
 		provider: provider,
 		oauth2Config: &oauth2.Config{
 			ClientID:     clientID,
@@ -138,7 +163,6 @@ func main() {
 		},
 		// TODO: Add support for Redis
 		store:             store,
-		whitelist:         whitelist,
 		staticDestination: staticDestination,
 		userIDOpts: userIDOpts{
 			header:      userIDHeader,
@@ -150,15 +174,8 @@ func main() {
 	}
 
 	// Setup complete, mark server ready
-	isReady.Store(true)
+	isReady.Set()
 
-	// Register handlers for routes
-	router := mux.NewRouter()
-	router.HandleFunc("/login/oidc", s.callback).Methods(http.MethodGet)
-	router.HandleFunc("/logout", s.logout).Methods(http.MethodGet)
-	router.PathPrefix("/").HandlerFunc(s.authenticate)
-
-	// Start server
-	log.Infof("Starting web server at %v:%v", hostname, port)
-	log.Fatal(http.ListenAndServe(hostname+":"+port, handlers.CORS()(router)))
+	// Block until server exits
+	<-stopCh
 }

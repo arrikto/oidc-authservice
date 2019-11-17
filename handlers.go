@@ -4,10 +4,10 @@ import (
 	"encoding/gob"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
+	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
 	"net/http"
 	"strings"
-	"sync/atomic"
 )
 
 const userSessionCookie = "authservice_session"
@@ -22,15 +22,6 @@ func init() {
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 	logger := loggerForRequest(r)
-
-	// Check whitelist
-	for _, prefix := range s.whitelist {
-		if strings.HasPrefix(r.URL.Path, prefix) {
-			logger.Infof("URI is whitelisted. Accepted without authorization.")
-			returnStatus(w, http.StatusOK, "OK")
-			return
-		}
-	}
 
 	// Check header for auth information.
 	// Adding it to a cookie to treat both cases uniformly.
@@ -201,12 +192,35 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 // readiness is the handler that checks if the authservice is ready for serving
 // requests.
 // Currently, it checks if the provider is nil, meaning that the setup hasn't finished yet.
-func readiness(isReady *atomic.Value) func(w http.ResponseWriter, r *http.Request) {
+func readiness(isReady *abool.AtomicBool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := http.StatusOK
-		if !isReady.Load().(bool) {
+		if !isReady.IsSet() {
 			code = http.StatusServiceUnavailable
 		}
 		w.WriteHeader(code)
+	}
+}
+
+func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger := loggerForRequest(r)
+			// Check whitelist
+			for _, prefix := range whitelist {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					logger.Infof("URI is whitelisted. Accepted without authorization.")
+					returnStatus(w, http.StatusOK, "OK")
+					return
+				}
+			}
+			// If server is not ready, return 503.
+			if !isReady.IsSet() {
+				returnStatus(w, http.StatusServiceUnavailable, "OIDC Setup is not complete yet.")
+				return
+			}
+			// Server ready, continue.
+			handler.ServeHTTP(w, r)
+		})
 	}
 }
