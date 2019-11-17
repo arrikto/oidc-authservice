@@ -26,6 +26,7 @@ require (
 	github.com/quasoft/memstore v0.0.0-20180925164028-84a050167438
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.2.2
+	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/yosssi/boltstore v1.0.0
 	golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
