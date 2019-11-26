@@ -22,6 +22,13 @@ docker-build:
 docker-push:
 	docker push $(IMG):$(TAG)
 
+bin/plantuml.jar:
+	mkdir -p bin
+	wget -O bin/plantuml.jar 'https://netix.dl.sourceforge.net/project/plantuml/1.2020.0/plantuml.1.2020.0.jar'
+
+docs: bin/plantuml.jar
+	java -jar bin/plantuml.jar -tsvg -v -o $(REPO_PATH)/docs/media $(REPO_PATH)/docs/media/source/oidc_authservice_sequence_diagram.plantuml
+
 e2e: docker-build
 	# Start AuthService container
 	docker run -d --user=root --name=e2e-authservice-container\
@@ -50,3 +57,5 @@ e2e: docker-build
 	docker container rm e2e-authservice-container
 
 publish: docker-build docker-push
+
+.PHONY: all build docker-build docker-push docs e2e publish

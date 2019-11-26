@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="625px" preserveAspectRatio="none" style="width:678px;height:625px;background:#FEF2DC;" version="1.1" viewBox="0 0 678 625" width="678px" zoomAndPan="magnify"><defs/><g><line style="stroke: #37A77C; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="21.5" x2="21.5" y1="29.6406" y2="589.0156"/><line style="stroke: #37A77C; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="182.5" x2="182.5" y1="29.6406" y2="589.0156"/><line style="stroke: #37A77C; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="356.5" x2="356.5" y1="29.6406" y2="589.0156"/><line style="stroke: #37A77C; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="519.5" x2="519.5" y1="29.6406" y2="589.0156"/><line style="stroke: #37A77C; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="619.5" x2="619.5" y1="29.6406" y2="589.0156"/><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="37" x="3" y="3"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="23" x="10" y="19.2822">User</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="81" x="142" y="3"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="67" x="149" y="19.2822">Istio Gateway</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="73" x="320" y="3"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="59" x="327" y="19.2822">AuthService</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="85" x="477" y="3"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="71" x="484" y="19.2822">OIDC Provider</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="95" x="572" y="3"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="81" x="579" y="19.2822">Resource Server</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="37" x="3" y="589.0156"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="23" x="10" y="605.2979">User</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="81" x="142" y="589.0156"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="67" x="149" y="605.2979">Istio Gateway</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="73" x="320" y="589.0156"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="59" x="327" y="605.2979">AuthService</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="85" x="477" y="589.0156"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="71" x="484" y="605.2979">OIDC Provider</text><rect fill="#363D5D" height="25.6406" style="stroke: #363D5D; stroke-width: 0.0;" width="95" x="572" y="589.0156"/><text fill="#FFFFFF" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="81" x="579" y="605.2979">Resource Server</text><polygon fill="#F6363F" points="170.5,51.2813,180.5,55.2813,170.5,59.2813,174.5,55.2813" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="21.5" x2="176.5" y1="55.2813" y2="55.2813"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="68" x="28.5" y="50.9229">GET /resource</text><polygon fill="#F6363F" points="344.5,51.2813,354.5,55.2813,344.5,59.2813,348.5,55.2813" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="182.5" x2="350.5" y1="55.2813" y2="55.2813"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="356.5" x2="398.5" y1="92.5625" y2="92.5625"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="398.5" x2="398.5" y1="92.5625" y2="105.5625"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="357.5" x2="398.5" y1="105.5625" y2="105.5625"/><polygon fill="#F6363F" points="367.5,101.5625,357.5,105.5625,367.5,109.5625,363.5,105.5625" style="stroke: #F6363F; stroke-width: 1.0;"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="126" x="363.5" y="76.5635">Not logged in, begin OIDC</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="22" x="363.5" y="88.2041">Flow</text><polygon fill="#F6363F" points="193.5,138.8438,183.5,142.8438,193.5,146.8438,189.5,142.8438" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="187.5" x2="355.5" y1="142.8438" y2="142.8438"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="150" x="199.5" y="126.8447">Redirect to OIDC Provider with</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="143" x="199.5" y="138.4854">state, client id &amp; callback URL</text><polygon fill="#F6363F" points="32.5,138.8438,22.5,142.8438,32.5,146.8438,28.5,142.8438" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="26.5" x2="181.5" y1="142.8438" y2="142.8438"/><polygon fill="#F6363F" points="507.5,176.125,517.5,180.125,507.5,184.125,511.5,180.125" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="21.5" x2="513.5" y1="180.125" y2="180.125"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="113" x="28.5" y="164.126">Follow redirect to OIDC</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="41" x="28.5" y="175.7666">Provider</text><line style="stroke: #F6363F; stroke-width: 1.0;" x1="519.5" x2="561.5" y1="205.7656" y2="205.7656"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="561.5" x2="561.5" y1="205.7656" y2="218.7656"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="520.5" x2="561.5" y1="218.7656" y2="218.7656"/><polygon fill="#F6363F" points="530.5,214.7656,520.5,218.7656,530.5,222.7656,526.5,218.7656" style="stroke: #F6363F; stroke-width: 1.0;"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="52" x="526.5" y="201.4072">Login User</text><polygon fill="#F6363F" points="32.5,252.0469,22.5,256.0469,32.5,260.0469,28.5,256.0469" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="26.5" x2="518.5" y1="256.0469" y2="256.0469"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="140" x="38.5" y="240.0479">Redirect to callback URL with</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="138" x="38.5" y="251.6885">state and authorization code</text><polygon fill="#F6363F" points="170.5,277.6875,180.5,281.6875,170.5,285.6875,174.5,281.6875" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="21.5" x2="176.5" y1="281.6875" y2="281.6875"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="137" x="28.5" y="277.3291">GET /callback with auth code</text><polygon fill="#F6363F" points="344.5,277.6875,354.5,281.6875,344.5,285.6875,348.5,281.6875" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="182.5" x2="350.5" y1="281.6875" y2="281.6875"/><polygon fill="#F6363F" points="367.5,314.9688,357.5,318.9688,367.5,322.9688,363.5,318.9688" style="stroke: #F6363F; stroke-width: 1.0;"/><polygon fill="#F6363F" points="507.5,314.9688,517.5,318.9688,507.5,322.9688,511.5,318.9688" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="361.5" x2="513.5" y1="318.9688" y2="318.9688"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="136" x="373.5" y="302.9697">Exchange auth code with ID</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="109" x="373.5" y="314.6104">token and get userinfo</text><line style="stroke: #F6363F; stroke-width: 1.0;" x1="356.5" x2="398.5" y1="356.25" y2="356.25"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="398.5" x2="398.5" y1="356.25" y2="369.25"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="357.5" x2="398.5" y1="369.25" y2="369.25"/><polygon fill="#F6363F" points="367.5,365.25,357.5,369.25,367.5,373.25,363.5,369.25" style="stroke: #F6363F; stroke-width: 1.0;"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="136" x="363.5" y="340.251">Create session for logged-in</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="103" x="363.5" y="351.8916">user in backend store</text><polygon fill="#F6363F" points="193.5,402.5313,183.5,406.5313,193.5,410.5313,189.5,406.5313" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="187.5" x2="355.5" y1="406.5313" y2="406.5313"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="147" x="199.5" y="390.5322">Set Session Cookie + Redirect</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="127" x="199.5" y="402.1729">to original URL (/resource)</text><polygon fill="#F6363F" points="32.5,402.5313,22.5,406.5313,32.5,410.5313,28.5,406.5313" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="26.5" x2="181.5" y1="406.5313" y2="406.5313"/><polygon fill="#F6363F" points="170.5,428.1719,180.5,432.1719,170.5,436.1719,174.5,432.1719" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="21.5" x2="176.5" y1="432.1719" y2="432.1719"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="132" x="28.5" y="427.8135">GET /resource (with cookie)</text><polygon fill="#F6363F" points="344.5,428.1719,354.5,432.1719,344.5,436.1719,348.5,432.1719" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="182.5" x2="350.5" y1="432.1719" y2="432.1719"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="356.5" x2="398.5" y1="469.4531" y2="469.4531"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="398.5" x2="398.5" y1="469.4531" y2="482.4531"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="357.5" x2="398.5" y1="482.4531" y2="482.4531"/><polygon fill="#F6363F" points="367.5,478.4531,357.5,482.4531,367.5,486.4531,363.5,482.4531" style="stroke: #F6363F; stroke-width: 1.0;"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="108" x="363.5" y="453.4541">Logged in, add UserID</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="41" x="363.5" y="465.0947">Headers</text><polygon fill="#F6363F" points="193.5,504.0938,183.5,508.0938,193.5,512.0938,189.5,508.0938" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="187.5" x2="355.5" y1="508.0938" y2="508.0938"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="130" x="199.5" y="503.7354">200 OK + UsedID Headers</text><polygon fill="#F6363F" points="607.5,541.375,617.5,545.375,607.5,549.375,611.5,545.375" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="182.5" x2="613.5" y1="545.375" y2="545.375"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="132" x="189.5" y="529.376">GET /resource (with UserID</text><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="45" x="189.5" y="541.0166">Headers)</text><polygon fill="#F6363F" points="32.5,567.0156,22.5,571.0156,32.5,575.0156,28.5,571.0156" style="stroke: #F6363F; stroke-width: 1.0;"/><line style="stroke: #F6363F; stroke-width: 1.0;" x1="26.5" x2="618.5" y1="571.0156" y2="571.0156"/><text fill="#363D5D" font-family="'Lato'" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="128" x="38.5" y="566.6572">Resource Server response</text><!--MD5=[334c304a00c46f2832ee4e3ee481ed3c]
+@startuml oidc_authservice_sequence_diagram
+
+
+skinparam Shadowing false
+skinparam BackgroundColor #FEF2DC
+skinparam ComponentStyle uml2
+skinparam Default {
+  FontName  'Lato'
+  FontColor #363D5D
+  FontSize  10
+}
+
+skinparam Sequence {
+  ArrowThickness 1
+  ArrowColor #F6363F
+  ActorBorderThickness 1
+  LifeLineBorderColor #37A77C
+  ParticipantBorderThickness 0
+}
+skinparam Participant {
+  BackgroundColor #363D5D
+  BorderColor #363D5D
+  FontColor #FFFFFF
+}
+
+skinparam Actor {
+  BackgroundColor #363D5D
+  BorderColor #363D5D
+}
+skinparam wrapMessageWidth 150
+
+participant User as user
+participant "Istio Gateway" as gw
+participant AuthService as authservice
+participant "OIDC Provider" as oidc
+participant "Resource Server" as rs
+
+!pragma teoz true
+user -> gw: GET /resource
+& gw -> authservice:
+
+authservice -> authservice: Not logged in, begin OIDC Flow
+
+authservice -> gw: Redirect to OIDC Provider with state, client id & callback URL
+& gw -> user:
+
+user -> oidc: Follow redirect to OIDC Provider
+oidc -> oidc: Login User
+oidc -> user: Redirect to callback URL with state and authorization code
+
+user -> gw: GET /callback with auth code
+& gw -> authservice:
+
+authservice <-> oidc: Exchange auth code with ID token and get userinfo
+
+authservice -> authservice: Create session for logged-in user in backend store
+
+authservice -> gw: Set Session Cookie + Redirect to original URL (/resource)
+& gw -> user:
+
+user -> gw: GET /resource (with cookie)
+& gw -> authservice:
+
+authservice -> authservice: Logged in, add UserID Headers
+
+authservice -> gw: 200 OK + UsedID Headers
+
+gw -> rs: GET /resource (with UserID Headers)
+
+rs -> user: Resource Server response
+
+@enduml
+
+PlantUML version 1.2020.00(Sat Jan 11 14:30:53 EET 2020)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Java Version: 11.0.6+10-post-Ubuntu-1ubuntu118.04.1
+Operating System: Linux
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

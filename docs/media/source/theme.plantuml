@@ -1,0 +1,37 @@
+!define BLACK   #363D5D
+!define RED     #F6363F
+!define PINK    #F6216E
+!define MAGENTA #A54FBD
+!define GREEN   #37A77C
+!define YELLOW  #F97A00
+!define BLUE    #1E98F2
+!define CYAN    #25AFCA
+!define WHITE   #FEF2DC
+
+' Base Setting
+skinparam Shadowing false
+skinparam BackgroundColor WHITE
+skinparam ComponentStyle uml2
+skinparam Default {
+  FontName  'Lato'
+  FontColor BLACK
+  FontSize  10
+}
+
+skinparam Sequence {
+  ArrowThickness 1
+  ArrowColor RED
+  ActorBorderThickness 1
+  LifeLineBorderColor GREEN
+  ParticipantBorderThickness 0
+}
+skinparam Participant {
+  BackgroundColor BLACK
+  BorderColor BLACK
+  FontColor #FFFFFF
+}
+
+skinparam Actor {
+  BackgroundColor BLACK
+  BorderColor BLACK
+}
