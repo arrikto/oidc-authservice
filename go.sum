@@ -73,6 +73,8 @@ github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5 h1:hNna6Fi0eP1f2sMBe/
 github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5/go.mod h1:f1SCnEOt6sc3fOJfPQDRDzHOtSXuTtnz0ImG9kPRDV0=
 github.com/yosssi/boltstore v1.0.0 h1:oJthEgNJB/v2TgwrNS2J9S+Cf/8dt2fImf7GT1Qz1hM=
 github.com/yosssi/boltstore v1.0.0/go.mod h1:zSl4HJqNcQ6mxETA0wdp73Pu6rgP37VWQh+xer52324=
+github.com/yosssi/boltstore v1.0.1-0.20150916121936-36632d491655 h1:6MtnxkRnXNw3zdUX/y271QqrkSw89vGpqfO76brQ7+4=
+github.com/yosssi/boltstore v1.0.1-0.20150916121936-36632d491655/go.mod h1:zSl4HJqNcQ6mxETA0wdp73Pu6rgP37VWQh+xer52324=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc h1:c0o/qxkaO2LF5t6fQrT4b5hzyggAkLLlCUjqfRxd8Q4=
 golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
