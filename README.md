@@ -12,9 +12,9 @@ For more information, see [this article](https://journal.arrikto.com/kubeflow-au
 
 Currently it only supports OIDC's [Authorization Code Flow](http://openid.net/specs/openid-connect-basic-1_0.html#CodeFlow), similar to OAuth 2.0 Authorization Code Grant.
 
-## Example auth flow
+## Sequence Diagram for an Authentication Flow
 
-![](https://raw.githubusercontent.com/ajmyyra/ambassador-auth-oidc/3c5fb7b6913f0e7f0b024f52f7503afa4c460636/misc/OIDC-flow.png)
+![OIDC AuthService Sequence Diagram](docs/media/oidc_authservice_sequence_diagram.svg)
 
 ## Options
 
@@ -31,6 +31,7 @@ Following environment variables are used by the software.
 * **SERVER_HOSTNAME** Hostname to listen for requests. Defaults to all IPv4/6 interfaces (0.0.0.0, ::).
 * **SERVER_PORT** Port to listen for requests. Default is 8080.
 * **SKIP_AUTH_URI** Space separated whitelist of URIs like "/info /health" to bypass authorization. Contains nothing by default.
+  **WARNING:** Make sure that the path in SKIP_AUTH_URI matches the path in the VirtualService definition of your Service Mesh. If it doesn't (eg you whitelist /dex and you match /dex/ in the VirtualService) you could leave resources exposed! (in this example, the /dex path is exposed)
 
 OIDC-AuthService stores sessions and other state in a local file using BoltDB.
 Other stores will be added soon.

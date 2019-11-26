@@ -1,0 +1,46 @@
+@startuml oidc_authservice_sequence_diagram
+
+!include theme.plantuml
+skinparam wrapMessageWidth 150
+
+participant User as user
+participant "Istio Gateway" as gw
+participant AuthService as authservice
+participant "OIDC Provider" as oidc
+participant "Resource Server" as rs
+
+!pragma teoz true
+user -> gw: GET /resource
+& gw -> authservice:
+
+authservice -> authservice: Not logged in, begin OIDC Flow
+
+authservice -> gw: Redirect to OIDC Provider with state, client id & callback URL
+& gw -> user:
+
+user -> oidc: Follow redirect to OIDC Provider
+oidc -> oidc: Login User
+oidc -> user: Redirect to callback URL with state and authorization code
+
+user -> gw: GET /callback with auth code
+& gw -> authservice:
+
+authservice <-> oidc: Exchange auth code with ID token and get userinfo
+
+authservice -> authservice: Create session for logged-in user in backend store
+
+authservice -> gw: Set Session Cookie + Redirect to original URL (/resource)
+& gw -> user:
+
+user -> gw: GET /resource (with cookie)
+& gw -> authservice:
+
+authservice -> authservice: Logged in, add UserID Headers
+
+authservice -> gw: 200 OK + UsedID Headers
+
+gw -> rs: GET /resource (with UserID Headers)
+
+rs -> user: Resource Server response
+
+@enduml
