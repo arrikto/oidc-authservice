@@ -56,8 +56,11 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		if s.userIDOpts.tokenHeader != "" {
 			w.Header().Set(s.userIDOpts.tokenHeader, session.Values["idtoken"].(string))
 		}
+		logger.Debug("Existing user session "+userID)
 		returnStatus(w, http.StatusOK, "OK")
 		return
+	} else {
+		logger.Debug("New user session "+session.Values["userid"].(string))
 	}
 
 	// User is NOT logged in.
@@ -68,6 +71,8 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Failed to save state in store: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
+	} else {
+		logger.Debug("State saved "+session.Values["userid"].(string))
 	}
 
 	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(id), http.StatusFound)
