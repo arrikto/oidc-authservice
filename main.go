@@ -31,6 +31,7 @@ const (
 	defaultUserIDPrefix      = ""
 	defaultUserIDClaim       = "email"
 	defaultSessionMaxAge     = "86400"
+	defaultLogLevel          = "info"
 )
 
 // Issue: https://github.com/gorilla/sessions/issues/200
@@ -87,6 +88,9 @@ func main() {
 	storePath := getEnvOrDie("STORE_PATH")
 	// Sessions
 	sessionMaxAge := getEnvOrDefault("SESSION_MAX_AGE", defaultSessionMaxAge)
+	// Log level
+	logLevel := getEnvOrDefault("LOG_LEVEL", defaultLogLevel)
+	setLogLevel(logLevel)
 
 	/////////////////////////////////////////////////////
 	// Start server immediately for whitelisted routes //
@@ -111,6 +115,7 @@ func main() {
 	/////////////////////////////////
 	// Resume setup asynchronously //
 	/////////////////////////////////
+
 
 	// OIDC Discovery
 	var provider *oidc.Provider

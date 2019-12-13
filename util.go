@@ -19,6 +19,17 @@ func loggerForRequest(r *http.Request) *log.Entry {
 	})
 }
 
+
+func setLogLevel(level string) {
+	if strings.EqualFold(level, "warn") {
+		log.SetLevel(log.WarnLevel)
+	} else if strings.EqualFold(level, "debug") {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+}
+
 func getUserIP(r *http.Request) string {
 	headerIP := r.Header.Get("X-Forwarded-For")
 	if headerIP != "" {
