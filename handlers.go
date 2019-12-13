@@ -59,9 +59,9 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		logger.Debug("Existing user session "+userID)
 		returnStatus(w, http.StatusOK, "OK")
 		return
-	} else {
-		logger.Debugf("New user session %+v\n",session)
 	}
+
+	logger.Debugf("New user session %+v\n",session)
 
 	// User is NOT logged in.
 	// Initiate OIDC Flow with Authorization Request.
@@ -71,9 +71,9 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Failed to save state in store: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
-	} else {
-		logger.Debugf("State saved %+v\n",session)
 	}
+
+	logger.Debugf("State saved %+v\n",session)
 
 	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(id), http.StatusFound)
 }
