@@ -32,6 +32,7 @@ Following environment variables are used by the software.
 * **SERVER_PORT** Port to listen for requests. Default is 8080.
 * **SKIP_AUTH_URI** Space separated whitelist of URIs like "/info /health" to bypass authorization. Contains nothing by default.
   **WARNING:** Make sure that the path in SKIP_AUTH_URI matches the path in the VirtualService definition of your Service Mesh. If it doesn't (eg you whitelist /dex and you match /dex/ in the VirtualService) you could leave resources exposed! (in this example, the /dex path is exposed)
+* **CA_BUNDLE** Path to file containing custom CA certificates to use when connecting to an OIDC provider that uses self-signed certificates.
 
 OIDC-AuthService stores sessions and other state in a local file using BoltDB.
 Other stores will be added soon.
