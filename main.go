@@ -14,6 +14,7 @@ import (
 	"github.com/yosssi/boltstore/reaper"
 	"github.com/yosssi/boltstore/store"
 	"golang.org/x/oauth2"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -43,6 +44,7 @@ type server struct {
 	staticDestination    string
 	sessionMaxAgeSeconds int
 	userIDOpts
+	caBundle []byte
 }
 
 type userIDOpts struct {
@@ -68,6 +70,7 @@ func main() {
 	// OIDC Provider
 	providerURL := getURLEnvOrDie("OIDC_PROVIDER")
 	authURL := os.Getenv("OIDC_AUTH_URL")
+	caBundlePath := os.Getenv("CA_BUNDLE")
 	// OIDC Client
 	oidcScopes := clean(strings.Split(getEnvOrDie("OIDC_SCOPES"), " "))
 	clientID := getEnvOrDie("CLIENT_ID")
@@ -108,15 +111,25 @@ func main() {
 		close(stopCh)
 	}(stopCh)
 
+	// Read CA bundle
+	var caBundle []byte
+	var err error
+	if caBundlePath != "" {
+		caBundle, err = ioutil.ReadFile(caBundlePath)
+		if err != nil {
+			log.Fatalf("Could not read CA bundle path %s: %v", caBundlePath, err)
+		}
+	}
+
 	/////////////////////////////////
 	// Resume setup asynchronously //
 	/////////////////////////////////
 
 	// OIDC Discovery
 	var provider *oidc.Provider
-	var err error
+	ctx := setTLSContext(context.Background(), caBundle)
 	for {
-		provider, err = oidc.NewProvider(context.Background(), providerURL.String())
+		provider, err = oidc.NewProvider(ctx, providerURL.String())
 		if err == nil {
 			break
 		}
@@ -173,6 +186,7 @@ func main() {
 			claim:       userIDClaim,
 		},
 		sessionMaxAgeSeconds: sessionMaxAgeSeconds,
+		caBundle:             caBundle,
 	}
 
 	// Setup complete, mark server ready

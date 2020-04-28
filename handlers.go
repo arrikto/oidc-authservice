@@ -103,8 +103,9 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		returnStatus(w, http.StatusInternalServerError, "Failed to retrieve state.")
 	}
 
+	ctx := setTLSContext(r.Context(), s.caBundle)
 	// Exchange the authorization code with {access, refresh, id}_token
-	oauth2Token, err := s.oauth2Config.Exchange(r.Context(), authCode)
+	oauth2Token, err := s.oauth2Config.Exchange(ctx, authCode)
 	if err != nil {
 		logger.Errorf("Failed to exchange authorization code with token: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
@@ -120,7 +121,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// Verifying received ID token
 	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
-	_, err = verifier.Verify(r.Context(), rawIDToken)
+	_, err = verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Unable to verify ID token.")
@@ -129,7 +130,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// UserInfo endpoint to get claims
 	claims := map[string]interface{}{}
-	userInfo, err := s.provider.UserInfo(r.Context(), oauth2.StaticTokenSource(oauth2Token))
+	userInfo, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
