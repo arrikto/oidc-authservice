@@ -1,0 +1,30 @@
+{{ template "header.html" . }}
+
+<body>
+    <div class="wrapper">
+      <header class="header">
+        <img src="{{ .ThemeURL }}/logo.svg" />
+      </header>
+      <main class="main" style="background-image:url({{ .ThemeURL }}/bg.svg);">
+        <div class="box">
+          <div class="box-content">
+            You have successfully logged out from {{ .ClientName }}
+          </div>
+          <form
+            class="button-wrapper"
+            action="{{resolve_url_ref .ProviderURL "/users/sign_out"}}"
+            method="post"
+            target="_self"
+          >
+            <input
+              class="button uppercase"
+              type="submit"
+              value="Log out from GitLab"
+            />
+          </form>
+        </div>
+      </main>
+    </div>
+  </body>
+
+{{ template "footer.html" . }}

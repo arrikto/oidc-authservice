@@ -1,0 +1,52 @@
+{{ template "header.html" . }}
+
+<body>
+<div class="wrapper">
+	<header class="header">
+		<img src="{{ .ThemeURL }}/logo.svg" />
+	</header>
+	<main class="main" style="background-image:url({{ .ThemeURL }}/bg.svg);">
+		<div class="box">
+			<div class="box-content">
+				You have successfully logged out from {{ .ClientName }}.
+			</div>
+			<div class="box-content" id="logout_message">
+				Logging you out from GitLab...
+			</div>
+		</div>
+	</main>
+</div>
+</body>
+
+
+<script>
+	function runOnLoad(fn) {
+        if (document.readyState === "complete") {
+            fn()
+        } else {
+            // Loading still in progress.
+            // To wait for it to complete, add "DOMContentLoaded" or "load" listeners.
+
+            window.addEventListener("load", () => {
+                fn()
+            });
+        }
+    }
+
+    let gitlabLogout = () => {
+        let req = new XMLHttpRequest();
+        req.open("POST", "{{ resolve_url_ref .ProviderURL "/users/sign_out" }}");
+        req.withCredentials = true;
+        setTimeout(
+            () => {
+                window.location.replace("{{ .ProviderURL }}");
+            },
+			3000
+		);
+        req.send();
+    }
+
+    runOnLoad(() => {gitlabLogout()})
+</script>
+
+{{ template "footer.html" . }}

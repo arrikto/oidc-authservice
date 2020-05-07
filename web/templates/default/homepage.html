@@ -1,0 +1,21 @@
+{{ template "header.html" . }}
+
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <img src="{{ .ThemeURL }}/logo.svg" />
+      </header>
+      <main class="main" style="background-image:url({{ .ThemeURL }}/bg.svg);">
+        <div class="box">
+          <div class="box-content">
+            Welcome to {{ .ClientName }}
+          </div>
+          <form class="button-wrapper" action="/" method="get" target="_self">
+            <input class="button uppercase" type="submit" value="Log in" />
+          </form>
+        </div>
+      </main>
+    </div>
+  </body>
+
+{{ template "footer.html" . }}

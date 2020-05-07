@@ -32,6 +32,7 @@ WORKDIR $APP_HOME
 
 # Copy in binary and give permissions
 COPY --from=builder /go/bin/oidc-authservice $APP_HOME
+COPY web $APP_HOME/web
 RUN chmod +x $APP_HOME/oidc-authservice
 RUN chown -R $USER:$GROUP $APP_HOME
 
