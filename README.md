@@ -16,6 +16,11 @@ Currently it only supports OIDC's [Authorization Code Flow](http://openid.net/sp
 
 ![OIDC AuthService Sequence Diagram](docs/media/oidc_authservice_sequence_diagram.svg)
 
+## Design Docs
+
+For more details on how various aspects of the AuthService are designed, see the design doc for the relevant section:
+* [Logout](docs/logout.md)
+
 ## Options
 
 Following environment variables are used by the software.

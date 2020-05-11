@@ -12,7 +12,13 @@ import (
 	"strings"
 )
 
-const userSessionCookie = "authservice_session"
+const (
+	userSessionCookie      = "authservice_session"
+	userSessionUserID      = "userid"
+	userSessionClaims      = "claims"
+	userSessionIDToken     = "idtoken"
+	userSessionOAuthTokens = "oauth2token"
+)
 
 func init() {
 	// Register type for claims.
@@ -148,10 +154,10 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 
-	session.Values["userid"] = claims[s.userIDOpts.claim].(string)
-	session.Values["claims"] = claims
-	session.Values["idtoken"] = rawIDToken
-	session.Values["oauth2token"] = oauth2Token
+	session.Values[userSessionUserID] = claims[s.userIDOpts.claim].(string)
+	session.Values[userSessionClaims] = claims
+	session.Values[userSessionIDToken] = rawIDToken
+	session.Values[userSessionOAuthTokens] = oauth2Token
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
 	}
@@ -184,6 +190,23 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
+
+	// Check if the provider has a revocation_endpoint
+	revocationEndpoint, err := revocationEndpoint(s.provider)
+	if err != nil {
+		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
+	} else {
+		ctx := setTLSContext(r.Context(), s.caBundle)
+		token := session.Values[userSessionOAuthTokens].(oauth2.Token)
+		err := revokeTokens(ctx, revocationEndpoint, &token, s.oauth2Config.ClientID, s.oauth2Config.ClientSecret)
+		if err != nil {
+			logger.Errorf("Error revoking tokens: %v", err)
+			returnStatus(w, http.StatusInternalServerError, "Failed to revoke access/refresh tokens, please try again")
+			return
+		}
+		logger.Info("Access/Refresh tokens revoked")
+	}
+
 	session.Options.MaxAge = -1
 	if err := sessions.Save(r, w); err != nil {
 		logger.Errorf("Couldn't delete user session: %v", err)

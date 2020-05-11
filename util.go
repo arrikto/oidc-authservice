@@ -104,3 +104,11 @@ func setTLSContext(ctx context.Context, caBundle []byte) context.Context {
 	tlsConf := &http.Client{Transport: tr}
 	return context.WithValue(ctx, oauth2.HTTPClient, tlsConf)
 }
+
+func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
+	client := http.DefaultClient
+	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
+		client = c
+	}
+	return client.Do(req.WithContext(ctx))
+}
