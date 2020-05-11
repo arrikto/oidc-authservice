@@ -6,13 +6,20 @@ import (
 	"encoding/gob"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
+	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
 	"net/http"
 	"strings"
 )
 
-const userSessionCookie = "authservice_session"
+const (
+	userSessionCookie       = "authservice_session"
+	userSessionUserID       = "userid"
+	userSessionClaims       = "claims"
+	userSessionIDToken      = "idtoken"
+	userSessionOAuth2Tokens = "oauth2tokens"
+)
 
 func init() {
 	// Register type for claims.
@@ -105,14 +112,14 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
 	// Exchange the authorization code with {access, refresh, id}_token
-	oauth2Token, err := s.oauth2Config.Exchange(ctx, authCode)
+	oauth2Tokens, err := s.oauth2Config.Exchange(ctx, authCode)
 	if err != nil {
 		logger.Errorf("Failed to exchange authorization code with token: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
 		return
 	}
 
-	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+	rawIDToken, ok := oauth2Tokens.Extra("id_token").(string)
 	if !ok {
 		logger.Error("No id_token field available.")
 		returnStatus(w, http.StatusInternalServerError, "No id_token field in OAuth 2.0 token.")
@@ -130,7 +137,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// UserInfo endpoint to get claims
 	claims := map[string]interface{}{}
-	userInfo, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Token))
+	userInfo, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
@@ -148,10 +155,10 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 
-	session.Values["userid"] = claims[s.userIDOpts.claim].(string)
-	session.Values["claims"] = claims
-	session.Values["idtoken"] = rawIDToken
-	session.Values["oauth2token"] = oauth2Token
+	session.Values[userSessionUserID] = claims[s.userIDOpts.claim].(string)
+	session.Values[userSessionClaims] = claims
+	session.Values[userSessionIDToken] = rawIDToken
+	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
 	}
@@ -184,6 +191,30 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
+
+	// Check if the provider has a revocation_endpoint
+	_revocationEndpoint, err := revocationEndpoint(s.provider)
+	if err != nil {
+		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
+	} else {
+		ctx := setTLSContext(r.Context(), s.caBundle)
+		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
+		err := revokeTokens(ctx, _revocationEndpoint, &token, s.oauth2Config.ClientID, s.oauth2Config.ClientSecret)
+		if err != nil {
+			logger.Errorf("Error revoking tokens: %v", err)
+			statusCode := http.StatusInternalServerError
+			// If the server returned 503, return it as well as the client might want to retry
+			if reqErr, ok := errors.Cause(err).(*requestError); ok {
+				if reqErr.StatusCode == http.StatusServiceUnavailable {
+					statusCode = reqErr.StatusCode
+				}
+			}
+			returnStatus(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
+			return
+		}
+		logger.WithField("userid", session.Values[userSessionUserID].(string)).Info("Access/Refresh tokens revoked")
+	}
+
 	session.Options.MaxAge = -1
 	if err := sessions.Save(r, w); err != nil {
 		logger.Errorf("Couldn't delete user session: %v", err)
