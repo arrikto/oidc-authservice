@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
+	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
 	"net/http"
@@ -13,11 +14,11 @@ import (
 )
 
 const (
-	userSessionCookie      = "authservice_session"
-	userSessionUserID      = "userid"
-	userSessionClaims      = "claims"
-	userSessionIDToken     = "idtoken"
-	userSessionOAuthTokens = "oauth2token"
+	userSessionCookie       = "authservice_session"
+	userSessionUserID       = "userid"
+	userSessionClaims       = "claims"
+	userSessionIDToken      = "idtoken"
+	userSessionOAuth2Tokens = "oauth2tokens"
 )
 
 func init() {
@@ -157,7 +158,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Values[userSessionUserID] = claims[s.userIDOpts.claim].(string)
 	session.Values[userSessionClaims] = claims
 	session.Values[userSessionIDToken] = rawIDToken
-	session.Values[userSessionOAuthTokens] = oauth2Token
+	session.Values[userSessionOAuth2Tokens] = oauth2Token
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
 	}
@@ -197,14 +198,21 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
 	} else {
 		ctx := setTLSContext(r.Context(), s.caBundle)
-		token := session.Values[userSessionOAuthTokens].(oauth2.Token)
+		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
 		err := revokeTokens(ctx, revocationEndpoint, &token, s.oauth2Config.ClientID, s.oauth2Config.ClientSecret)
 		if err != nil {
 			logger.Errorf("Error revoking tokens: %v", err)
-			returnStatus(w, http.StatusInternalServerError, "Failed to revoke access/refresh tokens, please try again")
+			statusCode := http.StatusInternalServerError
+			// If the server returned 503, return it as well as the client might want to retry
+			if reqErr, ok := errors.Cause(err).(*requestError); ok {
+				if reqErr.StatusCode == http.StatusServiceUnavailable {
+					statusCode = reqErr.StatusCode
+				}
+			}
+			returnStatus(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
 			return
 		}
-		logger.Info("Access/Refresh tokens revoked")
+		logger.WithField("userid", session.Values[userSessionUserID].(string)).Info("Access/Refresh tokens revoked")
 	}
 
 	session.Options.MaxAge = -1

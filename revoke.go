@@ -46,7 +46,7 @@ func revokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.
 }
 
 // revokeToken takes care of revoking an access/refresh token to the IdP.
-// The revocation procedure is described in RFC7009:+
+// The revocation procedure is described in RFC7009:
 // https://tools.ietf.org/html/rfc7009
 func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenType, clientID, clientSecret string) error {
 	// Verify revocation_endpoint has https url
@@ -61,7 +61,8 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	// Assume provider accepts http basic auth, because it is REQUIRED by the spec
+	// We only support basic auth now, we may need to support other methods in the future
+	// See: https://github.com/golang/oauth2/blob/bf48bf16ab8d622ce64ec6ce98d2c98f916b6303/internal/token.go#L204-L215
 	req.SetBasicAuth(clientID, clientSecret)
 
 	resp, err := doRequest(ctx, req)
@@ -73,9 +74,15 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err))
+			return &requestError{
+				StatusCode: resp.StatusCode,
+				Err:        errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err)),
+			}
 		}
-		return errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body))
+		return &requestError{
+			StatusCode: resp.StatusCode,
+			Err:        errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body)),
+		}
 	}
 	return nil
 }
