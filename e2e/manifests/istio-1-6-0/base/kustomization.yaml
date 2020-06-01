@@ -1,0 +1,6 @@
+resources:
+# Generated with `istioctl manifest generate --set profile=default --set addonComponents.prometheus.enabled=false`
+- dump.yaml
+- namespace.yaml
+
+

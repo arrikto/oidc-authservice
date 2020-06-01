@@ -1,0 +1,38 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: authn-filter
+spec:
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.http_connection_manager"
+            subFilter:
+              name: "envoy.router"
+      patch:
+        # For some reason, INSERT_FIRST doesn't work
+        operation: INSERT_BEFORE
+        value:
+          name: "envoy.filters.http.ext_authz"
+          config:
+            http_service:
+              server_uri:
+                uri: http://authservice.$(NAMESPACE).svc.cluster.local
+                cluster: outbound|8080||authservice.$(NAMESPACE).svc.cluster.local
+                timeout: 10s
+              authorization_request:
+                allowed_headers:
+                  patterns:
+                    # XXX: MUST be lowercase!
+                    - exact: "cookie"
+              authorization_response:
+                allowed_upstream_headers:
+                  patterns:
+                    - exact: "kubeflow-userid"
