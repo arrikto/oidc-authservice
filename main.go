@@ -4,11 +4,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/reaper"
@@ -16,36 +16,12 @@ import (
 	"golang.org/x/oauth2"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
+	"path"
 	"time"
-)
-
-// Option Defaults
-const (
-	defaultHealthServerPort  = "8081"
-	defaultServerHostname    = ""
-	defaultServerPort        = "8080"
-	defaultUserIDHeader      = "kubeflow-userid"
-	defaultUserIDTokenHeader = "kubeflow-userid-token"
-	defaultUserIDPrefix      = ""
-	defaultUserIDClaim       = "email"
-	defaultSessionMaxAge     = "86400"
 )
 
 // Issue: https://github.com/gorilla/sessions/issues/200
 const secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
-
-type server struct {
-	provider             *oidc.Provider
-	oauth2Config         *oauth2.Config
-	store                sessions.Store
-	staticDestination    string
-	sessionMaxAgeSeconds int
-	userIDOpts
-	caBundle []byte
-}
 
 type userIDOpts struct {
 	header      string
@@ -56,40 +32,18 @@ type userIDOpts struct {
 
 func main() {
 
+	c, err := parseConfig()
+	if err != nil {
+		log.Fatalf("Failed to parse configuration: %+v", err)
+	}
+	log.Infof("Config: %+v", c)
+
 	// Start readiness probe immediately
-	log.Infof("Starting readiness probe at %v", defaultHealthServerPort)
+	log.Infof("Starting readiness probe at %v", c.ReadinessProbePort)
 	isReady := abool.New()
 	go func() {
-		log.Fatal(http.ListenAndServe(":"+defaultHealthServerPort, http.HandlerFunc(readiness(isReady))))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", c.ReadinessProbePort), readiness(isReady)))
 	}()
-
-	/////////////
-	// Options //
-	/////////////
-
-	// OIDC Provider
-	providerURL := getURLEnvOrDie("OIDC_PROVIDER")
-	authURL := os.Getenv("OIDC_AUTH_URL")
-	caBundlePath := os.Getenv("CA_BUNDLE")
-	// OIDC Client
-	oidcScopes := clean(strings.Split(getEnvOrDie("OIDC_SCOPES"), " "))
-	clientID := getEnvOrDie("CLIENT_ID")
-	clientSecret := getEnvOrDie("CLIENT_SECRET")
-	redirectURL := getURLEnvOrDie("REDIRECT_URL")
-	staticDestination := os.Getenv("STATIC_DESTINATION_URL")
-	whitelist := clean(strings.Split(os.Getenv("SKIP_AUTH_URI"), " "))
-	// UserID Options
-	userIDHeader := getEnvOrDefault("USERID_HEADER", defaultUserIDHeader)
-	userIDTokenHeader := getEnvOrDefault("USERID_TOKEN_HEADER", defaultUserIDTokenHeader)
-	userIDPrefix := getEnvOrDefault("USERID_PREFIX", defaultUserIDPrefix)
-	userIDClaim := getEnvOrDefault("USERID_CLAIM", defaultUserIDClaim)
-	// Server
-	hostname := getEnvOrDefault("SERVER_HOSTNAME", defaultServerHostname)
-	port := getEnvOrDefault("SERVER_PORT", defaultServerPort)
-	// Store
-	storePath := getEnvOrDie("STORE_PATH")
-	// Sessions
-	sessionMaxAge := getEnvOrDefault("SESSION_MAX_AGE", defaultSessionMaxAge)
 
 	/////////////////////////////////////////////////////
 	// Start server immediately for whitelisted routes //
@@ -99,37 +53,50 @@ func main() {
 
 	// Register handlers for routes
 	router := mux.NewRouter()
-	router.HandleFunc("/login/oidc", s.callback).Methods(http.MethodGet)
-	router.HandleFunc("/logout", s.logout).Methods(http.MethodGet)
-	router.PathPrefix("/").HandlerFunc(s.authenticate)
+	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, OIDCCallbackPath), s.callback).Methods(http.MethodGet)
+	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, SessionLogoutPath), s.logout).Methods(http.MethodGet)
+
+	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate)))
 
 	// Start server
-	log.Infof("Starting web server at %v:%v", hostname, port)
+	log.Infof("Starting server at %v:%v", c.Hostname, c.Port)
 	stopCh := make(chan struct{})
 	go func(stopCh chan struct{}) {
-		log.Fatal(http.ListenAndServe(hostname+":"+port, handlers.CORS()(whitelistMiddleware(whitelist, isReady)(router))))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), handlers.CORS()(router)))
 		close(stopCh)
 	}(stopCh)
 
-	// Read CA bundle
-	var caBundle []byte
-	var err error
-	if caBundlePath != "" {
-		caBundle, err = ioutil.ReadFile(caBundlePath)
-		if err != nil {
-			log.Fatalf("Could not read CA bundle path %s: %v", caBundlePath, err)
-		}
+	// Start web server
+	webServer := WebServer{
+		TemplatePaths: c.TemplatePath,
+		ProviderURL:   c.ProviderURL.String(),
+		ClientName:    c.ClientName,
+		ThemeURL:      resolvePathReference(c.ThemesURL, c.Theme).String(),
+		Frontend:      c.UserTemplateContext,
 	}
+	log.Infof("Starting web server at %v:%v", c.Hostname, c.WebServerPort)
+	go func() {
+		log.Fatal(webServer.Start(fmt.Sprintf("%s:%d", c.Hostname, c.WebServerPort)))
+	}()
 
 	/////////////////////////////////
 	// Resume setup asynchronously //
 	/////////////////////////////////
 
+	// Read custom CA bundle
+	var caBundle []byte
+	if c.CABundlePath != "" {
+		caBundle, err = ioutil.ReadFile(c.CABundlePath)
+		if err != nil {
+			log.Fatalf("Could not read CA bundle path %s: %v", c.CABundlePath, err)
+		}
+	}
+
 	// OIDC Discovery
 	var provider *oidc.Provider
 	ctx := setTLSContext(context.Background(), caBundle)
 	for {
-		provider, err = oidc.NewProvider(ctx, providerURL.String())
+		provider, err = oidc.NewProvider(ctx, c.ProviderURL.String())
 		if err == nil {
 			break
 		}
@@ -138,15 +105,13 @@ func main() {
 	}
 
 	endpoint := provider.Endpoint()
-	if authURL != "" {
-		endpoint.AuthURL = authURL
+	if len(c.OIDCAuthURL.String()) > 0 {
+		endpoint.AuthURL = c.OIDCAuthURL.String()
 	}
-
-	oidcScopes = append(oidcScopes, oidc.ScopeOpenID)
 
 	// Setup Store
 	// Using BoltDB by default
-	db, err := bolt.Open(storePath, 0666, nil)
+	db, err := bolt.Open(c.SessionStorePath, 0666, nil)
 	if err != nil {
 		log.Fatalf("Error opening bolt store: %v", err)
 	}
@@ -158,34 +123,30 @@ func main() {
 		log.Fatalf("Error creating session store: %v", err)
 	}
 
-	// Session Max-Age in seconds
-	sessionMaxAgeSeconds, err := strconv.Atoi(sessionMaxAge)
-	if err != nil {
-		log.Fatalf("Couldn't convert session MaxAge to int: %v", err)
-	}
-
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
 
 	*s = server{
 		provider: provider,
 		oauth2Config: &oauth2.Config{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
+			ClientID:     c.ClientID,
+			ClientSecret: c.ClientSecret,
 			Endpoint:     endpoint,
-			RedirectURL:  redirectURL.String(),
-			Scopes:       oidcScopes,
+			RedirectURL:  c.RedirectURL.String(),
+			Scopes:       c.OIDCScopes,
 		},
 		// TODO: Add support for Redis
-		store:             store,
-		staticDestination: staticDestination,
+		store:                  store,
+		afterLoginRedirectURL:  c.AfterLoginURL.String(),
+		homepageURL:            c.HomepageURL.String(),
+		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
 		userIDOpts: userIDOpts{
-			header:      userIDHeader,
-			tokenHeader: userIDTokenHeader,
-			prefix:      userIDPrefix,
-			claim:       userIDClaim,
+			header:      c.UserIDHeader,
+			prefix:      c.UserIDPrefix,
+			claim:       c.UserIDClaim,
+			tokenHeader: c.UserIDTokenHeader,
 		},
-		sessionMaxAgeSeconds: sessionMaxAgeSeconds,
+		sessionMaxAgeSeconds: c.SessionMaxAge,
 		caBundle:             caBundle,
 	}
 

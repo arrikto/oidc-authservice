@@ -12,7 +12,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"os"
+	"path"
 	"strings"
 )
 
@@ -35,45 +35,6 @@ func getUserIP(r *http.Request) string {
 func returnStatus(w http.ResponseWriter, statusCode int, errorMsg string) {
 	w.WriteHeader(statusCode)
 	w.Write([]byte(errorMsg))
-}
-
-func getEnvOrDefault(key, fallback string) string {
-	value, exists := os.LookupEnv(key)
-	if !exists {
-		log.Println("No ", key, " specified, using '"+fallback+"' as default.")
-		return fallback
-	}
-	return value
-}
-
-func getURLEnvOrDie(URLEnv string) *url.URL {
-	envContent := os.Getenv(URLEnv)
-	parsedURL, err := url.Parse(envContent)
-	if err != nil {
-		log.Fatal("Not a valid URL for env variable ", URLEnv, ": ", envContent, "\n")
-	}
-
-	return parsedURL
-}
-
-func getEnvOrDie(envVar string) string {
-	envContent := os.Getenv(envVar)
-
-	if len(envContent) == 0 {
-		log.Fatal("Env variable ", envVar, " missing, exiting.")
-	}
-
-	return envContent
-}
-
-func clean(s []string) []string {
-	res := []string{}
-	for _, elem := range s {
-		if elem != "" {
-			res = append(res, elem)
-		}
-	}
-	return res
 }
 
 func createNonce(length int) string {
@@ -103,6 +64,20 @@ func setTLSContext(ctx context.Context, caBundle []byte) context.Context {
 	}
 	tlsConf := &http.Client{Transport: tr}
 	return context.WithValue(ctx, oauth2.HTTPClient, tlsConf)
+}
+
+func mustParseURL(rawURL string) *url.URL {
+	url, err := url.Parse(rawURL)
+	if err != nil {
+		panic(err)
+	}
+	return url
+}
+
+func resolvePathReference(u *url.URL, p string) *url.URL {
+	ret := *u
+	ret.Path = path.Join(ret.Path, p)
+	return &ret
 }
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
