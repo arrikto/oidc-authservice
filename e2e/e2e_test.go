@@ -149,13 +149,43 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
 	// Get Cookie and make authenticated request
-	cookie := resp.Header.Get("Set-Cookie")
+	cookie := strings.Split(resp.Header.Get("Set-Cookie"), ";")[0]
 	req, err = http.NewRequest(http.MethodGet, appURL.String(), nil)
 	require.Nil(t, err)
 	req.Header.Set("Cookie", cookie)
 	resp, err = client.Do(req)
 	require.Nil(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	/////////////////
+	// Test Logout //
+	/////////////////
+
+	// Cookie authentication should fail
+	logoutURL := appURL.ResolveReference(mustParseURL("/authservice/logout"))
+	req, err = http.NewRequest(http.MethodPost, logoutURL.String(), nil)
+	require.Nil(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err = client.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+	// Header authentication should succeed
+	req, err = http.NewRequest(http.MethodPost, logoutURL.String(), nil)
+	require.Nil(t, err)
+	bearer := strings.TrimSpace(strings.Split(cookie, "=")[1])
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearer))
+	resp, err = client.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+
+	// User should be logged out now
+	req, err = http.NewRequest(http.MethodGet, appURL.String(), nil)
+	require.Nil(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err = client.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusFound, resp.StatusCode)
 }
 
 func waitForStatefulSet(
