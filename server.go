@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
@@ -21,11 +22,28 @@ const (
 	userSessionOAuth2Tokens = "oauth2tokens"
 )
 
+var (
+	OIDCCallbackPath  = "/oidc/callback"
+	SessionLogoutPath = "/logout"
+)
+
 func init() {
 	// Register type for claims.
 	gob.Register(map[string]interface{}{})
 	gob.Register(oauth2.Token{})
 	gob.Register(oidc.IDToken{})
+}
+
+type server struct {
+	provider               *oidc.Provider
+	oauth2Config           *oauth2.Config
+	store                  sessions.Store
+	afterLoginRedirectURL  string
+	homepageURL            string
+	afterLogoutRedirectURL string
+	sessionMaxAgeSeconds   int
+	userIDOpts
+	caBundle []byte
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
@@ -88,8 +106,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// Get authorization code from authorization response.
 	var authCode = r.FormValue("code")
 	if len(authCode) == 0 {
-		logger.Error("Missing url parameter: code")
-		returnStatus(w, http.StatusBadRequest, "Missing url parameter: code")
+		logger.Warnf("Missing url parameter: code. Redirecting to homepage `%s'.", s.homepageURL)
+		http.Redirect(w, r, s.homepageURL, http.StatusFound)
 		return
 	}
 
@@ -145,7 +163,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = userInfo.Claims(&claims); err != nil {
-		logger.Println("Problem getting userinfo claims:", err.Error())
+		logger.Errorf("Problem getting userinfo claims: %v", err)
 		returnStatus(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
 		return
 	}
@@ -155,20 +173,28 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 
-	session.Values[userSessionUserID] = claims[s.userIDOpts.claim].(string)
+	userID, ok := claims[s.userIDOpts.claim].(string)
+	if !ok {
+		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.userIDOpts.claim, claims)
+		returnStatus(w, http.StatusInternalServerError, fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.userIDOpts.claim))
+		return
+	}
+	session.Values[userSessionUserID] = userID
 	session.Values[userSessionClaims] = claims
 	session.Values[userSessionIDToken] = rawIDToken
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
+		returnStatus(w, http.StatusInternalServerError, "Error creating user session")
+		return
 	}
 
 	logger.Info("Login validated with ID token, redirecting.")
 
 	// Getting original destination from DB with state
 	var destination = state.origURL
-	if s.staticDestination != "" {
-		destination = s.staticDestination
+	if s.afterLoginRedirectURL != "" {
+		destination = s.afterLoginRedirectURL
 	}
 
 	http.Redirect(w, r, destination, http.StatusFound)
@@ -183,12 +209,12 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	session, err := s.store.Get(r, userSessionCookie)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
 		return
 	}
 	if session.IsNew {
 		logger.Warn("Request doesn't have a valid session.")
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -220,13 +246,13 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Couldn't delete user session: %v", err)
 	}
 	logger.Info("Successful logout.")
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
 }
 
 // readiness is the handler that checks if the authservice is ready for serving
 // requests.
 // Currently, it checks if the provider is nil, meaning that the setup hasn't finished yet.
-func readiness(isReady *abool.AtomicBool) func(w http.ResponseWriter, r *http.Request) {
+func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := http.StatusOK
 		if !isReady.IsSet() {
@@ -236,6 +262,15 @@ func readiness(isReady *abool.AtomicBool) func(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// whitelistMiddleware is a middleware that
+// - Allows all requests that match the whitelist
+// - If the server is ready, forwards requests to be evaluated further
+// - If the server is NOT ready, denies requests not permitted by the whitelist
+//
+// This is necessary because in some topologies, the OIDC Provider and the AuthService
+// live are in the same cluster and requests pass through the AuthService.
+// Allowing the whitelisted requests before OIDC is configured is necessary for
+// the OIDC discovery request to succeed.
 func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
