@@ -12,11 +12,12 @@ type config struct {
 	ProviderURL *url.URL `required:"true" split_words:"true" envconfig:"OIDC_PROVIDER"`
 
 	// OIDC Client
-	ClientID     string   `required:"true" split_words:"true"`
-	ClientSecret string   `required:"true" split_words:"true"`
-	OIDCAuthURL  *url.URL `split_words:"true"`
-	RedirectURL  *url.URL `split_words:"true"`
-	OIDCScopes   []string `split_words:"true" default:"openid"`
+	ClientID                string   `required:"true" split_words:"true"`
+	ClientSecret            string   `required:"true" split_words:"true"`
+	OIDCAuthURL             *url.URL `split_words:"true"`
+	RedirectURL             *url.URL `split_words:"true"`
+	OIDCScopes              []string `split_words:"true" default:"openid"`
+	StrictSessionValidation bool     `split_words:"true"`
 
 	// General
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`

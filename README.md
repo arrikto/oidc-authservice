@@ -95,6 +95,15 @@ Session store-related settings:
 | `SESSION_STORE_PATH` | "/var/lib/authservice/data.db" | Path to local session store. Backed by BoltDB. |
 | `SESSION_MAX_AGE` | "86400" | Time in seconds after which sessions expire. Defaults to a day (24h). |
 
+By default, the AuthService keeps sessions to check if a user is authenticated. However, there may be times where
+we want to check a user's logged in status at the Provider, effectively making the Provider the one keeping the
+user's logged in status to enable access revocation scenarios and centralized management.
+
+| Setting | Default | Description |
+| - | - | - |
+| `STRICT_SESSION_VALIDATION` | `false` | Be strict about session validity by quering the OIDC provider for the validity of the token at each individual request, by hitting the userinfo endpoint. This ensures the authservice can detect an OIDC token has been revoked on the OIDC provider immediately, and destroy its own session. However, it may increase the load on the OIDC provider and introduces additional latency. Disabled by default, enable with "on" OR "true". |
+
+
 OIDC AuthService can add extra headers based on the userid that was detected.
 Applications can then use those headers to identify the user.
 

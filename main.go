@@ -146,8 +146,9 @@ func main() {
 			claim:       c.UserIDClaim,
 			tokenHeader: c.UserIDTokenHeader,
 		},
-		sessionMaxAgeSeconds: c.SessionMaxAge,
-		caBundle:             caBundle,
+		sessionMaxAgeSeconds:    c.SessionMaxAge,
+		strictSessionValidation: c.StrictSessionValidation,
+		caBundle:                caBundle,
 	}
 
 	// Setup complete, mark server ready

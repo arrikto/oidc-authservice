@@ -35,13 +35,14 @@ func init() {
 }
 
 type server struct {
-	provider               *oidc.Provider
-	oauth2Config           *oauth2.Config
-	store                  sessions.Store
-	afterLoginRedirectURL  string
-	homepageURL            string
-	afterLogoutRedirectURL string
-	sessionMaxAgeSeconds   int
+	provider                *oidc.Provider
+	oauth2Config            *oauth2.Config
+	store                   sessions.Store
+	afterLoginRedirectURL   string
+	homepageURL             string
+	afterLogoutRedirectURL  string
+	sessionMaxAgeSeconds    int
+	strictSessionValidation bool
 	userIDOpts
 	caBundle []byte
 }
@@ -71,21 +72,43 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		returnStatus(w, http.StatusInternalServerError, "Couldn't get user session.")
 		return
 	}
-	// User is logged in
-	if !session.IsNew {
-		// Add userid header
-		userID := session.Values["userid"].(string)
-		if userID != "" {
-			w.Header().Set(s.userIDOpts.header, s.userIDOpts.prefix+userID)
-		}
-		if s.userIDOpts.tokenHeader != "" {
-			w.Header().Set(s.userIDOpts.tokenHeader, session.Values["idtoken"].(string))
-		}
-		returnStatus(w, http.StatusOK, "OK")
+	if session.IsNew {
+		s.authCodeFlowAuthenticationRequest(w, r)
 		return
 	}
 
-	// User is NOT logged in.
+	// User is logged in
+	if s.strictSessionValidation {
+		ctx := setTLSContext(r.Context(), s.caBundle)
+		oauth2Tokens := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
+		_, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2Tokens))
+		if err != nil {
+			logger.Warnf("UserInfo request failed, assuming expired token: %v", err)
+			session.Options.MaxAge = -1
+			if err := sessions.Save(r, w); err != nil {
+				logger.Errorf("Couldn't delete user session: %v", err)
+			}
+			s.authCodeFlowAuthenticationRequest(w, r)
+			return
+		}
+	}
+	// Add userid header
+	userID := session.Values["userid"].(string)
+	if userID != "" {
+		w.Header().Set(s.userIDOpts.header, s.userIDOpts.prefix+userID)
+	}
+	if s.userIDOpts.tokenHeader != "" {
+		w.Header().Set(s.userIDOpts.tokenHeader, session.Values["idtoken"].(string))
+	}
+	w.WriteHeader(http.StatusOK)
+	return
+
+}
+
+// authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
+func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *http.Request) {
+	logger := loggerForRequest(r)
+
 	// Initiate OIDC Flow with Authorization Request.
 	state := newState(r.URL.String())
 	id, err := state.save(s.store)
@@ -244,6 +267,8 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = -1
 	if err := sessions.Save(r, w); err != nil {
 		logger.Errorf("Couldn't delete user session: %v", err)
+		returnStatus(w, http.StatusInternalServerError, "Couldn't delete user session")
+		return
 	}
 	logger.Info("Successful logout.")
 	http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
