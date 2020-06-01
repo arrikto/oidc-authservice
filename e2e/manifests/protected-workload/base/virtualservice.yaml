@@ -1,0 +1,18 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: workload
+spec:
+  gateways:
+    - kubeflow/kubeflow-gateway
+  hosts:
+    - '*'
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: workload.$(NAMESPACE).svc.cluster.local
+            port:
+              number: 80

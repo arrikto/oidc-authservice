@@ -120,5 +120,13 @@ Can be used with:
 
 # E2E Tests
 
-For the E2E tests, we setup build the AuthService and run it along with an OIDC Provider (Dex) as Docker containers.
-Then, we issue requests to confirm we get the functionality we expect.
+For E2E tests, we use [K3d](https://k3d.io/), a very lightweight way to run a K8s cluster
+locally using Docker. For E2E tests to work, you need the following external tools:
+* `kustomize`
+* `kubectl`
+* `k3d`
+
+Then simply run `make e2e`.
+Note: The AuthService image must be pushed to a public registry in order for the E2E test to find it.
+To ensure a public registry is used, run as `IMG=<public-registry-img> make e2e`, which will build and
+push the AuthService image to the given repo and then use it to run the E2E tests. 

@@ -16,6 +16,9 @@ build:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o bin/oidc-authservice
 	chmod +x bin/oidc-authservice
 
+test:
+	go test -v ./
+
 docker-build:
 	docker build -t $(IMG):$(TAG) .
 
@@ -29,32 +32,11 @@ bin/plantuml.jar:
 docs: bin/plantuml.jar
 	java -jar bin/plantuml.jar -tsvg -v -o $(REPO_PATH)/docs/media $(REPO_PATH)/docs/media/source/oidc_authservice_sequence_diagram.plantuml
 
-e2e: docker-build
-	# Start AuthService container
-	docker run -d --user=root --name=e2e-authservice-container\
-		--net host \
-		--env OIDC_PROVIDER=http://localhost:5556/dex \
-		--env OIDC_SCOPES=email \
-		--env CLIENT_ID=test \
-		--env CLIENT_SECRET=12341234 \
-		--env REDIRECT_URL=http://localhost:8080/login/oidc \
-		--env STORE_PATH=/data.db \
-		$(IMG):$(TAG)
-	# Start OIDC Provider container
-	docker run -d --user root --name=e2e-oidc-provider \
-		-v $(REPO_PATH)/e2e/dex-config.yaml:/etc/dex/cfg/config.yaml \
-		--net host \
-		quay.io/dexidp/dex:v2.19.0 \
-		serve /etc/dex/cfg/config.yaml
-	sleep 15
+e2e: publish
 	# Run E2E tests
-	-go test ./e2e -v
-	# Teardown OIDC Provider container
-	docker container stop e2e-oidc-provider
-	docker container rm e2e-oidc-provider
-	# Teardown AuthService container
-	docker container stop e2e-authservice-container
-	docker container rm e2e-authservice-container
+	cd e2e/manifests/authservice/base && \
+		kustomize edit set image gcr.io/arrikto/kubeflow/oidc-authservice=$(IMG):$(TAG)
+	go test ./e2e -v
 
 publish: docker-build docker-push
 

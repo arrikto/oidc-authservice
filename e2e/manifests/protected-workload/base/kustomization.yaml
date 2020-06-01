@@ -1,0 +1,20 @@
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - virtualservice.yaml
+  - gateway.yaml
+
+namespace: kubeflow
+
+vars:
+  - name: NAMESPACE
+    objref:
+      apiVersion: v1
+      kind: Service
+      name: workload
+    fieldref:
+      fieldpath: metadata.namespace
+
+configurations:
+  - params.yaml
