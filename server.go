@@ -43,6 +43,7 @@ type server struct {
 	afterLogoutRedirectURL  string
 	sessionMaxAgeSeconds    int
 	strictSessionValidation bool
+	authHeader              string
 	userIDOpts
 	caBundle []byte
 }
@@ -55,8 +56,8 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	// Adding it to a cookie to treat both cases uniformly.
 	// This is also required by the gorilla/sessions package.
 	// TODO(yanniszark): change to standard 'Authorization: Bearer <value>' header
-	bearer := r.Header.Get("X-Auth-Token")
-	if bearer != "" {
+	bearer := getBearerToken(r.Header.Get(s.authHeader))
+	if len(bearer) != 0 {
 		r.AddCookie(&http.Cookie{
 			Name:   userSessionCookie,
 			Value:  bearer,
@@ -195,6 +196,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session := sessions.NewSession(s.store, userSessionCookie)
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
+	// Extra layer of CSRF protection
+	session.Options.SameSite = http.SameSiteStrictMode
 
 	userID, ok := claims[s.userIDOpts.claim].(string)
 	if !ok {
@@ -228,16 +231,28 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
 	logger := loggerForRequest(r)
 
+	// Clear all cookies, only header auth allowed for this endpoint
+	r.Header.Set("Cookie", "")
+	bearer := getBearerToken(r.Header.Get(s.authHeader))
+	if len(bearer) != 0 {
+		r.AddCookie(&http.Cookie{
+			Name:   userSessionCookie,
+			Value:  bearer,
+			Path:   "/",
+			MaxAge: 1,
+		})
+	}
+
 	// Revoke user session.
 	session, err := s.store.Get(r, userSessionCookie)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
-		http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if session.IsNew {
 		logger.Warn("Request doesn't have a valid session.")
-		http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 

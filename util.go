@@ -89,3 +89,11 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	// See: https://tools.ietf.org/html/rfc7009#section-2.2.1
 	return client.Do(req.WithContext(ctx))
 }
+
+func getBearerToken(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "Bearer ") {
+		return strings.TrimPrefix(value, "Bearer ")
+	}
+	return value
+}
