@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 KUSTOMIZE_URL = "https://github.com/kubernetes-sigs/kustomize/releases/download/v3.2.0/kustomize_3.2.0_linux_amd64"
 GO_URL = "https://dl.google.com/go/go1.14.1.linux-amd64.tar.gz"
-KUBECTL_URL = "https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl"
+KUBECTL_URL = "https://storage.googleapis.com/kubernetes-release/release/v1.18.2/bin/linux/amd64/kubectl"
 K3D_URL = "https://github.com/rancher/k3d/releases/download/v3.0.0-rc.0/k3d-linux-amd64"
 
 
