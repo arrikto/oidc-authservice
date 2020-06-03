@@ -31,4 +31,4 @@ configurations:
 images:
 - name: gcr.io/arrikto/kubeflow/oidc-authservice
   newName: gcr.io/arrikto-public/kubeflow/oidc-authservice
-  newTag: 9ed963f-dirty-4aa67a
+  newTag: 0c0b57b

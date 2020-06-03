@@ -39,10 +39,11 @@ bin/plantuml.jar:
 docs: bin/plantuml.jar
 	java -jar bin/plantuml.jar -tsvg -v -o $(REPO_PATH)/docs/media $(REPO_PATH)/docs/media/source/oidc_authservice_sequence_diagram.plantuml
 
-e2e: publish
+# e2e: publish
+e2e:
 	# Run E2E tests
-	cd e2e/manifests/authservice/base && \
-		kustomize edit set image gcr.io/arrikto/kubeflow/oidc-authservice=$(IMG):$(TAG)
+	# cd e2e/manifests/authservice/base && \
+		# kustomize edit set image gcr.io/arrikto/kubeflow/oidc-authservice=$(IMG):$(TAG)
 	go test ./e2e -v
 
 publish: docker-build docker-push

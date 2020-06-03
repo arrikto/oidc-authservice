@@ -31,5 +31,11 @@ jobs:
       - name: Unit tests
         run: make test
 
+      # - name: Docker Login
+      #   uses: azure/docker-login@v1
+      #   with:
+      #     username: ${{ secrets.DOCKERIO_USERNAME }}
+      #     password: ${{ secrets.DOCKERIO_PASSWORD }}
+
       - name: E2E Test
         run: make e2e
