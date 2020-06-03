@@ -1,0 +1,34 @@
+name: Go
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '0 0 * * *' # Run every day at 00:00 UTC.
+
+jobs:
+
+  ci:
+    name: CI
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Cache tools
+        id: cache-tools
+        uses: actions/cache@v1
+        with:
+          path: bin/deps
+          key: ${{ runner.os }}-${{ hashFiles('hack/binary_deps.py') }}
+
+      - name: Install binary deps
+        if: steps['cache-tools'].outputs['cache-hit'] != 'true'
+        run: make bin/deps
+
+      - name: Unit tests
+        run: make test
+
+      - name: E2E Test
+        run: make e2e

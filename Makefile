@@ -10,6 +10,13 @@ endif
 IMG ?= gcr.io/arrikto-playground/kubeflow/oidc-authservice
 TAG ?= $(GIT_VERSION)
 
+.EXPORT_ALL_VARIABLES:
+DOCKER_BUILDKIT		:= 1
+GO111MODULE			:= on
+PATH				:= $(CURDIR)/bin/deps:$(CURDIR)/bin/deps/go/bin:$(PATH)
+GOROOT				:= $(CURDIR)/bin/deps/go
+
+
 all: build
 
 build:
@@ -32,13 +39,17 @@ bin/plantuml.jar:
 docs: bin/plantuml.jar
 	java -jar bin/plantuml.jar -tsvg -v -o $(REPO_PATH)/docs/media $(REPO_PATH)/docs/media/source/oidc_authservice_sequence_diagram.plantuml
 
-e2e: publish
+e2e: docker-build
 	# Run E2E tests
 	cd e2e/manifests/authservice/base && \
 		kustomize edit set image gcr.io/arrikto/kubeflow/oidc-authservice=$(IMG):$(TAG)
 	# Use -count=1 to skip Go's test cache
-	go test -v -count=1 ./e2e
+	TEST_IMAGE=$(IMG):$(TAG) go test -v -count=1 ./e2e
 
 publish: docker-build docker-push
 
-.PHONY: all build docker-build docker-push docs e2e publish
+bin/deps:
+	mkdir -p bin/deps
+	hack/binary_deps.py bin/deps
+
+.PHONY: all build docker-build docker-push docs e2e publish bin/deps

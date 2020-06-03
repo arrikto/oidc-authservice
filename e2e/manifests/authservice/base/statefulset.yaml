@@ -19,7 +19,10 @@ spec:
       containers:
       - name: authservice
         image: gcr.io/arrikto/kubeflow/oidc-authservice:6ac9400
-        imagePullPolicy: Always
+        # XXX: In our CI tests, we import the target authservice image in the
+        # cluster beforehand, so we don't want want to retrieve it from a
+        # registry.
+        imagePullPolicy: Never
         ports:
         - name: http-api
           containerPort: 8080

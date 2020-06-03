@@ -31,7 +31,7 @@ The AuthService contains two server processes.
   the authservice will reply with a redirect to initiate the OIDC login.
 * A web server, to host necessary endpoints that need to be accessible to the user. These endpoints
   include the OIDC client redirect URL, the logout endpoint and helper HTML pages.
- 
+
 ## Options
 
 Following environment variables are used by the software.
@@ -131,14 +131,14 @@ Can be used with:
 
 # E2E Tests
 
-For E2E tests, we use [K3d](https://k3d.io/), a very lightweight way to run a K8s cluster
-locally using Docker. For E2E tests to work, you need the following external tools:
+For E2E tests, we use [K3d](https://k3d.io/), a very lightweight way to run a
+K8s cluster locally using Docker. For E2E tests to work, you need the following
+external tools:
+
 * `go (>=1.13)`
 * `kustomize`
 * `kubectl`
 * `k3d`
 
-Then simply run `make e2e`.
-Note: The AuthService image must be pushed to a public registry in order for the E2E test to find it.
-To ensure a public registry is used, run as `IMG=<public-registry-img> make e2e`, which will build and
-push the AuthService image to the given repo and then use it to run the E2E tests. 
+You can use `make bin/deps` to install them locally under `./bin/deps`. Then
+simply run `make e2e`.
