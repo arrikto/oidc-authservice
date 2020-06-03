@@ -11,6 +11,8 @@ spec:
     - match:
         - uri:
             prefix: /authservice/
+      rewrite:
+        uri: /
       route:
         - destination:
             host: authservice.$(NAMESPACE).svc.cluster.local

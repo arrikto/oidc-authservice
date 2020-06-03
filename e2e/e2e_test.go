@@ -73,9 +73,6 @@ func (suite *E2ETestSuite) SetupSuite() {
 	suite.Require().Nil(
 		waitForStatefulSet(suite.kubeclient, "istio-system", "authservice", timeout, period))
 
-	go portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
-	time.Sleep(5 * time.Second)
-
 	suite.appURL = mustParseURL("http://127.0.0.1:8080/")
 	suite.username = "user"
 	suite.password = "12341234"
@@ -83,11 +80,18 @@ func (suite *E2ETestSuite) SetupSuite() {
 }
 
 func (suite *E2ETestSuite) TearDownSuite() {
-	suite.stopCh <- struct{}{}
 	suite.Require().Nil(deleteK3DCluster())
 }
 
 func (suite *E2ETestSuite) TestDexLogin() {
+	// Port-forward the istio-ingressgateway for this test
+	go portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
+	time.Sleep(2 * time.Second)
+	defer func() {
+		suite.stopCh <- struct{}{}
+		time.Sleep(2 * time.Second)
+	}()
+
 	t := suite.T()
 	client := &http.Client{
 		// Don't follow redirects automatically
@@ -177,7 +181,7 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearer))
 	resp, err = client.Do(req)
 	require.Nil(t, err)
-	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	// User should be logged out now
 	req, err = http.NewRequest(http.MethodGet, appURL.String(), nil)
@@ -293,12 +297,17 @@ func portForward(kind, namespace, name, hostPort, targetPort string, stopCh chan
 		err := cmd.Wait()
 		if err != nil {
 			log.Errorf("Port-forward exited with error: %+v", err)
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				log.Errorf("Port-forward stderr: %v", exitErr.Stderr)
+			}
 		}
 		processExitedCh <- struct{}{}
 	}()
 	select {
 	case <-stopCh:
-		return
+		if err := cmd.Process.Kill(); err != nil {
+			log.Errorf("failed to kill process: %v", err)
+		}
 	case <-processExitedCh:
 		os.Exit(1)
 	}

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"math/rand"
@@ -32,9 +33,28 @@ func getUserIP(r *http.Request) string {
 	return strings.Split(r.RemoteAddr, ":")[0]
 }
 
-func returnStatus(w http.ResponseWriter, statusCode int, errorMsg string) {
+func returnMessage(w http.ResponseWriter, statusCode int, msg string) {
 	w.WriteHeader(statusCode)
-	w.Write([]byte(errorMsg))
+	w.Header().Set("Content-Type", "text/plain")
+	_, err := w.Write([]byte(msg))
+	if err != nil {
+		log.Errorf("Failed to write body: %v", err)
+	}
+}
+
+func returnJSONMessage(w http.ResponseWriter, statusCode int, jsonMsg interface{}) {
+	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "application/json")
+	jsonBytes, err := json.Marshal(jsonMsg)
+	if err != nil {
+		log.Errorf("Failed to marshal struct to json: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	_, err = w.Write(jsonBytes)
+	if err != nil {
+		log.Errorf("Failed to write body: %v", err)
+	}
 }
 
 func createNonce(length int) string {

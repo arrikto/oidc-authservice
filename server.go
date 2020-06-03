@@ -70,7 +70,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	session, err := s.store.Get(r, userSessionCookie)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Couldn't get user session.")
+		returnMessage(w, http.StatusInternalServerError, "Couldn't get user session.")
 		return
 	}
 	if session.IsNew {
@@ -115,7 +115,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 	id, err := state.save(s.store)
 	if err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Failed to save state in store.")
+		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
 
@@ -141,7 +141,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	var stateID = r.FormValue("state")
 	if len(stateID) == 0 {
 		logger.Error("Missing url parameter: state")
-		returnStatus(w, http.StatusBadRequest, "Missing url parameter: state")
+		returnMessage(w, http.StatusBadRequest, "Missing url parameter: state")
 		return
 	}
 
@@ -149,7 +149,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	state, err := load(s.store, stateID)
 	if err != nil {
 		logger.Errorf("Failed to retrieve state from store: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Failed to retrieve state.")
+		returnMessage(w, http.StatusInternalServerError, "Failed to retrieve state.")
 	}
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
@@ -157,14 +157,14 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	oauth2Tokens, err := s.oauth2Config.Exchange(ctx, authCode)
 	if err != nil {
 		logger.Errorf("Failed to exchange authorization code with token: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
+		returnMessage(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
 		return
 	}
 
 	rawIDToken, ok := oauth2Tokens.Extra("id_token").(string)
 	if !ok {
 		logger.Error("No id_token field available.")
-		returnStatus(w, http.StatusInternalServerError, "No id_token field in OAuth 2.0 token.")
+		returnMessage(w, http.StatusInternalServerError, "No id_token field in OAuth 2.0 token.")
 		return
 	}
 
@@ -173,7 +173,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	_, err = verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Unable to verify ID token.")
+		returnMessage(w, http.StatusInternalServerError, "Unable to verify ID token.")
 		return
 	}
 
@@ -182,13 +182,13 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	userInfo, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
+		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
 		return
 	}
 
 	if err = userInfo.Claims(&claims); err != nil {
 		logger.Errorf("Problem getting userinfo claims: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
+		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
 		return
 	}
 
@@ -202,7 +202,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	userID, ok := claims[s.userIDOpts.claim].(string)
 	if !ok {
 		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.userIDOpts.claim, claims)
-		returnStatus(w, http.StatusInternalServerError, fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.userIDOpts.claim))
+		returnMessage(w, http.StatusInternalServerError, fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.userIDOpts.claim))
 		return
 	}
 	session.Values[userSessionUserID] = userID
@@ -211,7 +211,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Error creating user session")
+		returnMessage(w, http.StatusInternalServerError, "Error creating user session")
 		return
 	}
 
@@ -273,7 +273,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 					statusCode = reqErr.StatusCode
 				}
 			}
-			returnStatus(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
+			returnMessage(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
 			return
 		}
 		logger.WithField("userid", session.Values[userSessionUserID].(string)).Info("Access/Refresh tokens revoked")
@@ -282,11 +282,18 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = -1
 	if err := sessions.Save(r, w); err != nil {
 		logger.Errorf("Couldn't delete user session: %v", err)
-		returnStatus(w, http.StatusInternalServerError, "Couldn't delete user session")
+		returnMessage(w, http.StatusInternalServerError, "Couldn't delete user session")
 		return
 	}
 	logger.Info("Successful logout.")
-	http.Redirect(w, r, s.afterLogoutRedirectURL, http.StatusSeeOther)
+	resp := struct {
+		AfterLogoutURL string `json:"afterLogoutURL"`
+	}{
+		AfterLogoutURL: s.afterLogoutRedirectURL,
+	}
+	// Return 201 because the logout endpoint is still on the envoy-facing server,
+	// meaning that returning a 200 will result in the request being proxied upstream.
+	returnJSONMessage(w, http.StatusCreated, resp)
 }
 
 // readiness is the handler that checks if the authservice is ready for serving
@@ -319,13 +326,13 @@ func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(htt
 			for _, prefix := range whitelist {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					logger.Infof("URI is whitelisted. Accepted without authorization.")
-					returnStatus(w, http.StatusOK, "OK")
+					returnMessage(w, http.StatusOK, "OK")
 					return
 				}
 			}
 			// If server is not ready, return 503.
 			if !isReady.IsSet() {
-				returnStatus(w, http.StatusServiceUnavailable, "OIDC Setup is not complete yet.")
+				returnMessage(w, http.StatusServiceUnavailable, "OIDC Setup is not complete yet.")
 				return
 			}
 			// Server ready, continue.
