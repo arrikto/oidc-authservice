@@ -60,9 +60,15 @@ func parseConfig() (*config, error) {
 		return nil, err
 	}
 
-	c.RedirectURL = resolvePathReference(c.AuthserviceURLPrefix, OIDCCallbackPath)
-	c.HomepageURL = resolvePathReference(c.AuthserviceURLPrefix, HomepagePath)
-	c.AfterLogoutURL = resolvePathReference(c.AuthserviceURLPrefix, AfterLogoutPath)
+	if len(c.RedirectURL.String()) == 0 {
+		c.RedirectURL = resolvePathReference(c.AuthserviceURLPrefix, OIDCCallbackPath)
+	}
+	if len(c.HomepageURL.String()) == 0 {
+		c.HomepageURL = resolvePathReference(c.AuthserviceURLPrefix, HomepagePath)
+	}
+	if len(c.AfterLogoutURL.String()) == 0 {
+		c.AfterLogoutURL = resolvePathReference(c.AuthserviceURLPrefix, AfterLogoutPath)
+	}
 
 	c.UserTemplateContext = getEnvsFromPrefix("TEMPLATE_CONTEXT_")
 
