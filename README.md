@@ -52,7 +52,7 @@ Following environment variables are used by the software.
 | `OIDC_AUTH_URL` | `<empty>` | AuthService will initiate an Authorization Code OIDC flow by hitting this URL. Normally discovered automatically through the OIDC Provider's well-known endpoint. |
 | `CLIENT_NAME` | `AuthService` |A user-visible description for AuthService as an OIDC Client. It is recommended that you set it to a user-visible name for the application/domain that AuthService protects, e.g., `MyApp`. AuthService will *not* use this as part of contacting your OIDC Provider, but it
 will use it to auto-generate user-visible message in the frontend. , e.g., "You are now logged out of MyApp. Click here to log in again." |
-| `OIDC_SCOPES` | `openid` | Comma-separated list of [scopes](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims) to request access to. The `openid` scope is always added. |
+| `OIDC_SCOPES` | `openid,email` | Comma-separated list of [scopes](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims) to request access to. The `openid` scope is always added. |
 | `SERVER_HOSTNAME` | `<empty>` | Hostname to listen for judge requests. This is the server that proxies contacts to ask if a request is allowed. The default empty value means all IPv4/6 interfaces (0.0.0.0, ::). |
 | `SERVER_PORT` | `8081` | Port to listen to for judge requests. This is the server that proxies contacts to ask if a request is allowed. |
 | `SKIP_AUTH_URLS` | `<empty>` | Comma-separated list of URL path-prefixes for which to bypass authentication. For example, if `SKIP_AUTH_URL` contains `/my_app/` then requests to `<url>/my_app/*` are allowed without checking any credentials. Contains nothing by default. |
@@ -111,7 +111,7 @@ Applications can then use those headers to identify the user.
 | Setting | Default | Description |
 | - | - | - |
 | `USERID_CLAIM` | "email" |Claim whose value will be used as the userid (default `email`). |
-| `USERID_HEADER` | "kubeflow-userid-token" | Name of the header containing the user-id. |
+| `USERID_HEADER` | "kubeflow-userid" | Name of the header containing the user-id. |
 | `USERID_PREFIX` | "" | Prefix to add to the userid, which will be the value of the `USERID_HEADER`. |
 | `USERID_TOKEN_HEADER` | "" | Header in which to put the `id_token` for the upstream to find. |
 
