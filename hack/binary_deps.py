@@ -2,6 +2,7 @@
 
 import os
 import sys
+import stat
 import logging
 import tarfile
 import requests
@@ -57,15 +58,15 @@ def main():
 
     log.info("Installing kustomize...")
     download_to(KUSTOMIZE_URL, os.path.join(args.output_dir, "kustomize"))
-    os.chmod(os.path.join(args.output_dir, "kustomize"), 755)
+    os.chmod(os.path.join(args.output_dir, "kustomize"), stat.S_IRWXU)
 
     log.info("Installing kubectl...")
     download_to(KUBECTL_URL, os.path.join(args.output_dir, "kubectl"))
-    os.chmod(os.path.join(args.output_dir, "kubectl"), 755)
+    os.chmod(os.path.join(args.output_dir, "kubectl"), stat.S_IRWXU)
 
     log.info("Installing k3d...")
     download_to(K3D_URL, os.path.join(args.output_dir, "k3d"))
-    os.chmod(os.path.join(args.output_dir, "k3d"), 755)
+    os.chmod(os.path.join(args.output_dir, "k3d"), stat.S_IRWXU)
 
 
 if __name__ == "__main__":
