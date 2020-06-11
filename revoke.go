@@ -37,7 +37,7 @@ func revokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.
 		}
 	}
 	if token.RefreshToken != "" {
-		err := revokeToken(ctx, revocationEndpoint, token.AccessToken, "refresh_token", clientID, clientSecret)
+		err := revokeToken(ctx, revocationEndpoint, token.RefreshToken, "refresh_token", clientID, clientSecret)
 		if err != nil {
 			return errors.Wrap(err, "Failed to revoke refresh token")
 		}
