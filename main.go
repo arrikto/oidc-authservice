@@ -5,8 +5,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path"
+	"time"
+
 	"github.com/boltdb/bolt"
-	"github.com/coreos/go-oidc"
+	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -14,10 +19,8 @@ import (
 	"github.com/yosssi/boltstore/reaper"
 	"github.com/yosssi/boltstore/store"
 	"golang.org/x/oauth2"
-	"io/ioutil"
-	"net/http"
-	"path"
-	"time"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Issue: https://github.com/gorilla/sessions/issues/200
@@ -123,6 +126,26 @@ func main() {
 		log.Fatalf("Error creating session store: %v", err)
 	}
 
+	// Get Kubernetes authenticator
+	restConfig, err := clientconfig.GetConfig()
+	if err != nil {
+		log.Fatalf("Error getting K8s config: %v", err)
+	}
+	k8sAuthenticator, err := newKubernetesAuthenticator(restConfig, c.Audiences)
+	if err != nil {
+		log.Fatalf("Error creating K8s authenticator: %v", err)
+	}
+
+	// Get OIDC Session Authenticator
+	sessionAuthenticator := &sessionAuthenticator{
+		store:                   store,
+		cookie:                  userSessionCookie,
+		header:                  c.AuthHeader,
+		strictSessionValidation: c.StrictSessionValidation,
+		caBundle:                caBundle,
+		provider:                provider,
+	}
+
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
 
@@ -150,6 +173,7 @@ func main() {
 		strictSessionValidation: c.StrictSessionValidation,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
+		authenticators:          []authenticator.Request{sessionAuthenticator, k8sAuthenticator},
 	}
 
 	// Setup complete, mark server ready

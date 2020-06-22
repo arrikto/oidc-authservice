@@ -20,7 +20,7 @@ secretGenerator:
 
 vars:
 - fieldref:
-    fieldpath: metadata.namespace
+    fieldPath: metadata.namespace
   name: NAMESPACE
   objref:
     apiVersion: v1
@@ -31,4 +31,4 @@ configurations:
 images:
 - name: gcr.io/arrikto/kubeflow/oidc-authservice
   newName: gcr.io/arrikto-public/kubeflow/oidc-authservice
-  newTag: 9ed963f-dirty-4aa67a
+  newTag: ba062bb-dirty-1ebb3c

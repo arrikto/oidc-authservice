@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/coreos/go-oidc"
+	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 const (
@@ -39,6 +41,7 @@ type server struct {
 	provider                *oidc.Provider
 	oauth2Config            *oauth2.Config
 	store                   sessions.Store
+	authenticators          []authenticator.Request
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
@@ -52,69 +55,38 @@ type server struct {
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 	logger := loggerForRequest(r)
+	logger.Info("Authenticating request...")
 
-	// Check header for auth information.
-	// Adding it to a cookie to treat both cases uniformly.
-	// This is also required by the gorilla/sessions package.
-	// TODO(yanniszark): change to standard 'Authorization: Bearer <value>' header
-	bearer := getBearerToken(r.Header.Get(s.authHeader))
-	if len(bearer) != 0 {
-		r.AddCookie(&http.Cookie{
-			Name:   userSessionCookie,
-			Value:  bearer,
-			Path:   "/",
-			MaxAge: 1,
-		})
-	}
-
-	// Check if user session is valid
-	session, err := s.store.Get(r, userSessionCookie)
-	if err != nil {
-		logger.Errorf("Couldn't get user session: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Couldn't get user session.")
-		return
-	}
-	if session.IsNew {
-		s.authCodeFlowAuthenticationRequest(w, r)
-		return
-	}
-
-	// User is logged in
-	if s.strictSessionValidation {
-		ctx := setTLSContext(r.Context(), s.caBundle)
-		oauth2Tokens := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		// TokenSource takes care of automatically renewing the access token.
-		_, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, &oauth2Tokens))
+	var userInfo user.Info
+	for i, auth := range s.authenticators {
+		resp, found, err := auth.AuthenticateRequest(r)
 		if err != nil {
-			// Check if the OAuth token has expired and if it has, delete the
-			// user's session
-			var reqErr *requestError
-			if errors.As(err, &reqErr) && reqErr.Response.StatusCode == http.StatusUnauthorized {
-				logger.Info("UserInfo token has expired")
-				session.Options.MaxAge = -1
-				if err := sessions.Save(r, w); err != nil {
-					logger.Errorf("Couldn't delete user session: %v", err)
-				}
-				s.authCodeFlowAuthenticationRequest(w, r)
-				return
-			} else {
-				logger.Errorf("UserInfo request failed unexpectedly: %v", err)
-				returnMessage(w, http.StatusInternalServerError, "UserInfo request failed unexpectedly")
+			logger.Errorf("Error authenticating request using authenticator %d: %v", i, err)
+			// If we get a login expired error, it means the authenticator
+			// recognised a valid authentication method which has expired
+			var expiredErr *loginExpiredError
+			if errors.As(err, &expiredErr) {
+				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
 				return
 			}
 		}
+		if found {
+			userInfo = resp.User
+			logger.Infof("UserInfo: %+v", userInfo)
+			break
+		}
 	}
-	// Add userid header
-	userID := session.Values["userid"].(string)
-	if userID != "" {
-		w.Header().Set(s.userIDOpts.header, s.userIDOpts.prefix+userID)
+	if userInfo == nil {
+		logger.Infof("Failed to authenticate using authenticators. Initiating OIDC Authorization Code flow...")
+		// TODO: Detect "X-Requested-With" header and return 401
+		s.authCodeFlowAuthenticationRequest(w, r)
+		return
 	}
-	if s.userIDOpts.tokenHeader != "" {
-		w.Header().Set(s.userIDOpts.tokenHeader, session.Values["idtoken"].(string))
+	for k, v := range userInfoToHeaders(userInfo, s.userIDOpts) {
+		w.Header().Set(k, v)
 	}
 	w.WriteHeader(http.StatusOK)
 	return
-
 }
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow

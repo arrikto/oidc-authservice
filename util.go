@@ -8,13 +8,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func loggerForRequest(r *http.Request) *log.Entry {
@@ -116,4 +118,10 @@ func getBearerToken(value string) string {
 		return strings.TrimPrefix(value, "Bearer ")
 	}
 	return value
+}
+
+func userInfoToHeaders(info user.Info, opts userIDOpts) map[string]string {
+	res := map[string]string{}
+	res[opts.header] = info.GetName()
+	return res
 }
