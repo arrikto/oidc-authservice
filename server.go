@@ -5,13 +5,14 @@ package main
 import (
 	"encoding/gob"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
-	"net/http"
-	"strings"
 )
 
 const (
@@ -82,15 +83,25 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	if s.strictSessionValidation {
 		ctx := setTLSContext(r.Context(), s.caBundle)
 		oauth2Tokens := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		_, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2Tokens))
+		// TokenSource takes care of automatically renewing the access token.
+		_, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, &oauth2Tokens))
 		if err != nil {
-			logger.Warnf("UserInfo request failed, assuming expired token: %v", err)
-			session.Options.MaxAge = -1
-			if err := sessions.Save(r, w); err != nil {
-				logger.Errorf("Couldn't delete user session: %v", err)
+			// Check if the OAuth token has expired and if it has, delete the
+			// user's session
+			var reqErr *requestError
+			if errors.As(err, &reqErr) && reqErr.Response.StatusCode == http.StatusUnauthorized {
+				logger.Info("UserInfo token has expired")
+				session.Options.MaxAge = -1
+				if err := sessions.Save(r, w); err != nil {
+					logger.Errorf("Couldn't delete user session: %v", err)
+				}
+				s.authCodeFlowAuthenticationRequest(w, r)
+				return
+			} else {
+				logger.Errorf("UserInfo request failed unexpectedly: %v", err)
+				returnMessage(w, http.StatusInternalServerError, "UserInfo request failed unexpectedly")
+				return
 			}
-			s.authCodeFlowAuthenticationRequest(w, r)
-			return
 		}
 	}
 	// Add userid header
@@ -179,7 +190,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// UserInfo endpoint to get claims
 	claims := map[string]interface{}{}
-	userInfo, err := s.provider.UserInfo(ctx, oauth2.StaticTokenSource(oauth2Tokens))
+	userInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
@@ -269,8 +280,8 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 			statusCode := http.StatusInternalServerError
 			// If the server returned 503, return it as well as the client might want to retry
 			if reqErr, ok := errors.Cause(err).(*requestError); ok {
-				if reqErr.StatusCode == http.StatusServiceUnavailable {
-					statusCode = reqErr.StatusCode
+				if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
+					statusCode = reqErr.Response.StatusCode
 				}
 			}
 			returnMessage(w, statusCode, "Failed to revoke access/refresh tokens, please try again")

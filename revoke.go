@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/coreos/go-oidc"
-	"github.com/pkg/errors"
-	"golang.org/x/oauth2"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/coreos/go-oidc"
+	"github.com/pkg/errors"
+	"golang.org/x/oauth2"
 )
 
 // revocationEndpoint parses the OIDC Provider claims from the discovery document
@@ -77,13 +78,15 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return &requestError{
-				StatusCode: resp.StatusCode,
-				Err:        errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err)),
+				Response: resp,
+				Body:     body,
+				Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err)),
 			}
 		}
 		return &requestError{
-			StatusCode: resp.StatusCode,
-			Err:        errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body)),
+			Response: resp,
+			Body:     body,
+			Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body)),
 		}
 	}
 	return nil
