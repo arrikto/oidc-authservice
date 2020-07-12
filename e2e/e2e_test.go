@@ -7,22 +7,24 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/cenkalti/backoff/v4"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
-	"testing"
-	"time"
 )
 
 type E2ETestSuite struct {
@@ -250,7 +252,9 @@ func createK3DCluster() error {
 	if err != nil {
 		return err
 	}
-	return exec.Command("k3d", "get", "kubeconfig", "e2e-test-cluster", "--switch").Run()
+	kubeconfigPath := path.Join(os.Getenv("HOME"), ".kube/config")
+	return exec.Command("k3d", "get", "kubeconfig", "e2e-test-cluster",
+		"--switch", "--output", kubeconfigPath).Run()
 }
 
 func deleteK3DCluster() error {
