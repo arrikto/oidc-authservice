@@ -132,6 +132,7 @@ Can be used with:
 
 For E2E tests, we use [K3d](https://k3d.io/), a very lightweight way to run a K8s cluster
 locally using Docker. For E2E tests to work, you need the following external tools:
+* `go (>=1.13)`
 * `kustomize`
 * `kubectl`
 * `k3d`
