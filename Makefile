@@ -36,7 +36,8 @@ e2e: publish
 	# Run E2E tests
 	cd e2e/manifests/authservice/base && \
 		kustomize edit set image gcr.io/arrikto/kubeflow/oidc-authservice=$(IMG):$(TAG)
-	go test ./e2e -v
+	# Use -count=1 to skip Go's test cache
+	go test -v -count=1 ./e2e
 
 publish: docker-build docker-push
 
