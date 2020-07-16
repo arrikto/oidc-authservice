@@ -5,6 +5,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path"
+	"time"
+
 	"github.com/boltdb/bolt"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
@@ -14,10 +19,6 @@ import (
 	"github.com/yosssi/boltstore/reaper"
 	"github.com/yosssi/boltstore/store"
 	"golang.org/x/oauth2"
-	"io/ioutil"
-	"net/http"
-	"path"
-	"time"
 )
 
 // Issue: https://github.com/gorilla/sessions/issues/200
@@ -130,7 +131,7 @@ func main() {
 		provider: provider,
 		oauth2Config: &oauth2.Config{
 			ClientID:     c.ClientID,
-			ClientSecret: c.ClientSecret,
+			ClientSecret: c.ClientSecret.Reveal(),
 			Endpoint:     endpoint,
 			RedirectURL:  c.RedirectURL.String(),
 			Scopes:       c.OIDCScopes,

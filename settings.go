@@ -1,23 +1,26 @@
 package main
 
 import (
-	"github.com/kelseyhightower/envconfig"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/arrikto/oidc-authservice/pkg/common"
+	"github.com/kelseyhightower/envconfig"
 )
 
+// config holds all the configuration for the AuthService.
 type config struct {
 	// OIDC Provider
 	ProviderURL *url.URL `required:"true" split_words:"true" envconfig:"OIDC_PROVIDER"`
 
 	// OIDC Client
-	ClientID                string   `required:"true" split_words:"true"`
-	ClientSecret            string   `required:"true" split_words:"true"`
-	OIDCAuthURL             *url.URL `split_words:"true"`
-	RedirectURL             *url.URL `split_words:"true"`
-	OIDCScopes              []string `split_words:"true" default:"openid,email"`
-	StrictSessionValidation bool     `split_words:"true"`
+	ClientID                string                 `required:"true" split_words:"true"`
+	ClientSecret            common.ProtectedString `required:"true" split_words:"true"`
+	OIDCAuthURL             *url.URL               `split_words:"true"`
+	RedirectURL             *url.URL               `split_words:"true"`
+	OIDCScopes              []string               `split_words:"true" default:"openid,email"`
+	StrictSessionValidation bool                   `split_words:"true"`
 
 	// General
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`
