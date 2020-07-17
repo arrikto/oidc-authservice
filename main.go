@@ -38,6 +38,7 @@ func main() {
 		log.Fatalf("Failed to parse configuration: %+v", err)
 	}
 	log.Infof("Config: %+v", c)
+	log.Infof("Secret value: %s", c.ClientSecret.Reveal())
 
 	// Start readiness probe immediately
 	log.Infof("Starting readiness probe at %v", c.ReadinessProbePort)

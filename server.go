@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/pkg/common"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
@@ -88,7 +89,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Check if the OAuth token has expired and if it has, delete the
 			// user's session
-			var reqErr *requestError
+			var reqErr *common.RequestError
 			if errors.As(err, &reqErr) && reqErr.Response.StatusCode == http.StatusUnauthorized {
 				logger.Info("UserInfo token has expired")
 				session.Options.MaxAge = -1
@@ -279,7 +280,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 			logger.Errorf("Error revoking tokens: %v", err)
 			statusCode := http.StatusInternalServerError
 			// If the server returned 503, return it as well as the client might want to retry
-			if reqErr, ok := errors.Cause(err).(*requestError); ok {
+			if reqErr, ok := errors.Cause(err).(*common.RequestError); ok {
 				if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
 					statusCode = reqErr.Response.StatusCode
 				}

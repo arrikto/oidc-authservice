@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/pkg/common"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -70,11 +71,8 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, &requestError{
-			Response: resp,
-			Body:     body,
-			Err:      errors.Errorf("oidc: Calling UserInfo endpoint failed. body: %s", body),
-		}
+		return nil, errors.Wrap(common.NewRequestError(resp, body),
+			"oidc: Calling UserInfo endpoint failed.")
 	}
 
 	var userInfo UserInfo
