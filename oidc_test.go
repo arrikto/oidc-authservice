@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arrikto/oidc-authservice/pkg/common"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -117,7 +118,7 @@ func TestGetUserInfo_ContextCancelled(t *testing.T) {
 		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test"}))
 
 	// Check that we find a wrapped requestError
-	var reqErr *requestError
+	var reqErr *common.RequestError
 	if !errors.As(err, &reqErr) {
 		log.Fatalf("Returned error is not a requestError. Got: %+v", reqErr)
 	}

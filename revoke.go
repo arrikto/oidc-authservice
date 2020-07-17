@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/pkg/common"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -77,17 +78,11 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return &requestError{
-				Response: resp,
-				Body:     body,
-				Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err)),
-			}
+			return errors.Wrapf(common.NewRequestError(resp, nil),
+				"oidc: Token revocation failed and response body couldn't be read: %v", err)
 		}
-		return &requestError{
-			Response: resp,
-			Body:     body,
-			Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body)),
-		}
+		return errors.Wrap(common.NewRequestError(resp, body),
+			"oidc: Token revocation failed")
 	}
 	return nil
 }
