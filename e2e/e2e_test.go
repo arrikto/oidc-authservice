@@ -18,22 +18,27 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	appsv1 "k8s.io/api/apps/v1"
+	authv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type E2ETestSuite struct {
 	suite.Suite
-	kubeclient client.Client
-	appURL     *url.URL
-	username   string
-	password   string
-	stopCh     chan struct{}
+	kubeclient   client.Client
+	kubeclientgo *kubernetes.Clientset
+	appURL       *url.URL
+	username     string
+	password     string
+	stopCh       chan struct{}
 }
 
 func TestE2ETestSuite(t *testing.T) {
@@ -61,6 +66,7 @@ func (suite *E2ETestSuite) SetupSuite() {
 	kubeclient, err := client.New(restConfig, client.Options{})
 	suite.Require().Nil(err)
 	suite.kubeclient = kubeclient
+	suite.kubeclientgo = kubernetes.NewForConfigOrDie(restConfig)
 
 	timeout := time.Minute
 	period := 5 * time.Second
@@ -85,11 +91,72 @@ func (suite *E2ETestSuite) TearDownSuite() {
 	suite.Require().Nil(deleteK3DCluster())
 }
 
-func (suite *E2ETestSuite) TestDexLogin() {
+func (suite *E2ETestSuite) TestKubernetesLogin() {
 	// Port-forward the istio-ingressgateway for this test
-	go portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
+	go func() {
+		suite.T().Log("Starting port-forward...")
+		err := portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
+		if err != nil {
+			log.Fatalf("Port-forward failed: %+v", err)
+		}
+	}()
 	time.Sleep(2 * time.Second)
 	defer func() {
+		suite.T().Log("Stopping port-forward...")
+		suite.stopCh <- struct{}{}
+		time.Sleep(2 * time.Second)
+	}()
+
+	suite.T().Log("Testing Kubernetes login...")
+
+	suite.T().Log("Doing TokenRequest...")
+	exp := int64(3600)
+	tr := &authv1.TokenRequest{
+		Spec: authv1.TokenRequestSpec{
+			Audiences:         []string{"istio-ingressgateway.istio-system.svc.cluster.local"},
+			ExpirationSeconds: &exp,
+		},
+	}
+	ctx := context.Background()
+
+	tr, err := suite.kubeclientgo.CoreV1().ServiceAccounts("default").CreateToken(ctx, "default", tr, metav1.CreateOptions{})
+	suite.Require().NoError(err, "TokenRequest failed")
+
+	suite.T().Log("Making HTTP request with ServiceAccountToken...")
+	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	suite.Require().NoError(err, "Failed to create request")
+	token := tr.Status.Token
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	client := &http.Client{
+		// Don't follow redirects automatically
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				// Allow self-signed CAs for tests only
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	resp, err := client.Do(req)
+	suite.Require().NoError(err, "HTTP request with k8s auth failed")
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "Unexpected return code")
+}
+
+func (suite *E2ETestSuite) TestDexLogin() {
+	// Port-forward the istio-ingressgateway for this test
+	go func() {
+		suite.T().Log("Starting port-forward...")
+		err := portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
+		if err != nil {
+			log.Fatalf("Port-forward failed: %+v", err)
+		}
+	}()
+	time.Sleep(2 * time.Second)
+	defer func() {
+		suite.T().Log("Stopping port-forward...")
 		suite.stopCh <- struct{}{}
 		time.Sleep(2 * time.Second)
 	}()
@@ -211,6 +278,12 @@ func waitForStatefulSet(
 			log.Errorf("Error getting statefulset: %+v", err)
 			return backoff.Permanent(err)
 		}
+		if sts.Status.ObservedGeneration != sts.Generation {
+			return errors.New("StatefulSet has not converged yet")
+		}
+		if sts.Status.UpdatedReplicas != *sts.Spec.Replicas {
+			return errors.New("StatefulSet is rolling updating")
+		}
 		if sts.Status.ReadyReplicas != *sts.Spec.Replicas {
 			return fmt.Errorf("Statefulset not ready. Got: %v, Want: %v",
 				sts.Status.ReadyReplicas, sts.Spec.Replicas)
@@ -235,6 +308,12 @@ func waitForDeployment(
 		if err != nil {
 			log.Errorf("Error getting deployment: %+v", err)
 			return backoff.Permanent(err)
+		}
+		if deploy.Status.ObservedGeneration != deploy.Generation {
+			return errors.New("Deployment has not converged yet")
+		}
+		if deploy.Status.UpdatedReplicas != *deploy.Spec.Replicas {
+			return errors.New("Deployment is rolling updating")
 		}
 		if deploy.Status.ReadyReplicas != *deploy.Spec.Replicas {
 			return fmt.Errorf("Deployment not ready. Got: %v, Want: %v",
@@ -288,34 +367,29 @@ func applyKustomizations(kustomizations []string) error {
 	return nil
 }
 
-func portForward(kind, namespace, name, hostPort, targetPort string, stopCh chan struct{}) {
+func portForward(kind, namespace, name, hostPort, targetPort string, stopCh chan struct{}) error {
 	cmd := exec.Command("kubectl", "port-forward", "-n", namespace,
 		fmt.Sprintf("%s/%s", kind, name), fmt.Sprintf("%s:%s", hostPort, targetPort))
-	err := cmd.Start()
-	if err != nil {
-		log.Errorf("Error during port-forward: %+v", err)
-		os.Exit(1)
-	}
+
 	processExitedCh := make(chan struct{})
+	var output []byte
+	var err error
 	go func() {
-		err := cmd.Wait()
+		output, err = cmd.CombinedOutput()
 		if err != nil {
-			log.Errorf("Port-forward exited with error: %+v", err)
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				log.Errorf("Port-forward stderr: %v", exitErr.Stderr)
-			}
+			processExitedCh <- struct{}{}
 		}
-		processExitedCh <- struct{}{}
 	}()
+
 	select {
 	case <-stopCh:
 		if err := cmd.Process.Kill(); err != nil {
-			log.Errorf("failed to kill process: %v", err)
+			return errors.Wrap(err, "failed to kill process: %+v")
 		}
+		return nil
 	case <-processExitedCh:
-		os.Exit(1)
+		return errors.Errorf("Port-forward process exited unexpectedly, output: %s", output)
 	}
-
 }
 
 func mustParseURL(rawURL string) *url.URL {

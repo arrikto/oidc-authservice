@@ -6,6 +6,7 @@ resources:
 - statefulset.yaml
 - envoy-filter.yaml
 - pvc.yaml
+- rbac.yaml
 
 namespace: istio-system
 

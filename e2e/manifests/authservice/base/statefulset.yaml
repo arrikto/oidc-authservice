@@ -15,6 +15,7 @@ spec:
       labels:
         app: authservice
     spec:
+      serviceAccountName: authservice
       containers:
       - name: authservice
         image: gcr.io/arrikto/kubeflow/oidc-authservice:6ac9400
