@@ -225,7 +225,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
-	session.Options.SameSite = http.SameSiteStrictMode
+	session.Options.SameSite = http.SameSiteLaxMode
 
 	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
 	if !ok {
