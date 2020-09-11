@@ -18,16 +18,17 @@ type sessionAuthenticator struct {
 	header                  string
 	strictSessionValidation bool
 	caBundle                []byte
+	oauth2Config            *oauth2.Config
 	provider                *oidc.Provider
 }
 
-func (sessauth *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
 	logger := loggerForRequest(r)
 
 	// Check header for auth information.
 	// Adding it to a cookie to treat both cases uniformly.
 	// This is also required by the gorilla/sessions package.
-	bearer := getBearerToken(r.Header.Get(sessauth.header))
+	bearer := getBearerToken(r.Header.Get(sa.header))
 	if len(bearer) != 0 {
 		r.AddCookie(&http.Cookie{
 			Name:   userSessionCookie,
@@ -38,7 +39,7 @@ func (sessauth *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*aut
 	}
 
 	// Check if user session is valid
-	session, err := sessauth.store.Get(r, sessauth.cookie)
+	session, err := sa.store.Get(r, sa.cookie)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "couldn't get user session")
 	}
@@ -47,16 +48,38 @@ func (sessauth *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*aut
 	}
 
 	// User is logged in
-	if sessauth.strictSessionValidation {
-		ctx := setTLSContext(r.Context(), sessauth.caBundle)
-		oauth2Tokens := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		_, err := sessauth.provider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2Tokens))
+	if sa.strictSessionValidation {
+		ctx := setTLSContext(r.Context(), sa.caBundle)
+		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
+		// TokenSource takes care of automatically renewing the access token.
+		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
-			logger.Warnf("UserInfo request failed, assuming expired token: %v", err)
-			session.Options.MaxAge = -1
-			if err := sessions.Save(r, &httptest.ResponseRecorder{}); err != nil {
-				return nil, false, errors.Wrap(err, "couldn't delete user session")
+			var reqErr *requestError
+			if !errors.As(err, &reqErr) {
+				return nil, false, errors.Wrap(err, "UserInfo request failed unexpectedly")
 			}
+			if reqErr.Response.StatusCode != http.StatusUnauthorized {
+				return nil, false, errors.Wrapf(err, "UserInfo request with unexpected code '%d'", reqErr.Response.StatusCode)
+			}
+			// Access token has expired
+			logger.Info("UserInfo token has expired")
+			session.Options.MaxAge = -1
+			if err := sessions.Save(r, httptest.NewRecorder()); err != nil {
+				logger.Errorf("Couldn't delete user session: %v", err)
+			}
+			// Try to revoke token, just in case. According to the spec,
+			// trying to revoke an invalid token should return an OK response:
+			// https://tools.ietf.org/html/rfc7009#section-2.2
+			_revocationEndpoint, err := revocationEndpoint(sa.provider)
+			if err != nil {
+				logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
+			}
+			err = revokeTokens(ctx, _revocationEndpoint, &token,
+				sa.oauth2Config.ClientID, sa.oauth2Config.ClientSecret)
+			if err != nil {
+				logger.Errorf("Failed to revoke tokens: %v", err)
+			}
+			return nil, false, nil
 		}
 	}
 
