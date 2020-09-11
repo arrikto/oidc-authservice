@@ -306,9 +306,10 @@ func login(t *testing.T, appURL *url.URL, username, password string) string {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
-	// Get state value
+	// Get state cookie
 	t.Log("Getting endpoint")
 	authCodeURL := appURL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
+	stateCookie := resp.Cookies()
 
 	// Start OIDC Flow by hitting the authorization endpoint
 	resp, err = httpClient.Get(authCodeURL.String())
@@ -342,7 +343,13 @@ func login(t *testing.T, appURL *url.URL, username, password string) string {
 
 	// Get Authorization Code and call the AuthService's redirect url
 	oidcRedirectURL := resp.Request.URL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
-	resp, err = httpClient.Get(oidcRedirectURL.String())
+	req, err = http.NewRequest(http.MethodGet, oidcRedirectURL.String(), nil)
+	require.Nil(t, err)
+	// Add cookie for state CSRF
+	for _, c := range stateCookie {
+		req.AddCookie(c)
+	}
+	resp, err = httpClient.Do(req)
 	require.Nil(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
