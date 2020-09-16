@@ -47,6 +47,7 @@ type config struct {
 	CABundlePath       string `split_words:"true" envconfig:"CA_BUNDLE"`
 	SessionStorePath   string `split_words:"true" default:"/var/lib/authservice/data.db"`
 	SessionMaxAge      int    `split_words:"true" default:"86400"`
+	SessionSameSite    string `split_words:"true" default:"Lax"`
 
 	// Site
 	ClientName          string            `split_words:"true" default:"AuthService"`

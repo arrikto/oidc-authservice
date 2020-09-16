@@ -44,6 +44,7 @@ type server struct {
 	idTokenOpts             jwtClaimOpts
 	upstreamHTTPHeaderOpts  httpHeaderOpts
 	caBundle                []byte
+	sessionSameSite         string
 }
 
 // jwtClaimOpts specifies the location of the user's identity inside a JWT's
@@ -225,7 +226,15 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
-	session.Options.SameSite = http.SameSiteStrictMode
+	switch s.sessionSameSite {
+	case "None":
+		session.Options.SameSite = http.SameSiteNoneMode
+	case "Strict":
+		session.Options.SameSite = http.SameSiteStrictMode
+	default:
+		// Use Lax mode as default
+		session.Options.SameSite = http.SameSiteLaxMode
+	}
 
 	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
 	if !ok {

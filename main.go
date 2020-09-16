@@ -176,6 +176,7 @@ func main() {
 		caBundle:                caBundle,
 		authenticators:          []authenticator.Request{sessionAuthenticator, k8sAuthenticator},
 		authorizers:             []Authorizer{groupsAuthorizer},
+		sessionSameSite:         c.SessionSameSite,
 	}
 
 	// Setup complete, mark server ready
