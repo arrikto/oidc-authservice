@@ -112,9 +112,17 @@ Applications can then use those headers to identify the user.
 | Setting | Default | Description |
 | - | - | - |
 | `USERID_CLAIM` | "email" |Claim whose value will be used as the userid (default `email`). |
-| `USERID_HEADER` | "kubeflow-userid" | Name of the header containing the user-id. |
+| `GROUPS_CLAIM` | "groups" | Claim whose value will be used as the user's groups (default `groups`) |
+| `USERID_HEADER` | "kubeflow-userid" | Name of the header containing the user-id that will be added to the upstream request. |
 | `USERID_PREFIX` | "" | Prefix to add to the userid, which will be the value of the `USERID_HEADER`. |
-| `USERID_TOKEN_HEADER` | "" | Header in which to put the `id_token` for the upstream to find. |
+| `GROUPS_HEADER` | "kubeflow-groups" | Name of the header containing the groups that will be added to the upstream request.
+
+OIDC AuthService can also perform basic authorization checks. The following
+settings are related to authorization:
+
+| Setting | Default | Description |
+| - | - | - |
+| `GROUPS_ALLOWLIST` | "*" | List of groups that are allowed to pass authorization. By default, all groups are allowed. If you change this option, you may want to include the `system:serviceaccounts` group explicitly, if you need the AuthService to accept ServiceAccountTokens. |
 
 ## Usage
 

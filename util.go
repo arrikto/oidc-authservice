@@ -120,8 +120,21 @@ func getBearerToken(value string) string {
 	return value
 }
 
-func userInfoToHeaders(info user.Info, opts userIDOpts) map[string]string {
+func userInfoToHeaders(info user.Info, opts *httpHeaderOpts) map[string]string {
 	res := map[string]string{}
-	res[opts.header] = info.GetName()
+	res[opts.userIDHeader] = opts.userIDPrefix + info.GetName()
+	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
+	return res
+}
+
+func interfaceSliceToStringSlice(in []interface{}) []string {
+	if in == nil {
+		return nil
+	}
+
+	res := []string{}
+	for _, elem := range in {
+		res = append(res, elem.(string))
+	}
 	return res
 }
