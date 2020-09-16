@@ -31,11 +31,13 @@ type config struct {
 
 	// Identity Headers
 	UserIDHeader string `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
+	GroupsHeader string `split_words:"true" default:"kubeflow-groups"`
 	UserIDPrefix string `split_words:"true" envconfig:"USERID_PREFIX"`
 
 	// IDToken
 	UserIDClaim       string `split_words:"true" default:"email" envconfig:"USERID_CLAIM"`
 	UserIDTokenHeader string `split_words:"true" envconfig:"USERID_TOKEN_HEADER"`
+	GroupsClaim       string `split_words:"true" default:"groups"`
 
 	// Infra
 	Hostname           string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
@@ -52,6 +54,9 @@ type config struct {
 	Theme               string            `split_words:"true" default:"kubeflow"`
 	TemplatePath        []string          `split_words:"true"`
 	UserTemplateContext map[string]string `ignored:"true"`
+
+	// Authorization
+	GroupsAllowlist []string `split_words:"true" default:"*"`
 }
 
 func parseConfig() (*config, error) {

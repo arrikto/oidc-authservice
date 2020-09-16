@@ -26,13 +26,6 @@ import (
 // Issue: https://github.com/gorilla/sessions/issues/200
 const secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
 
-type userIDOpts struct {
-	header      string
-	tokenHeader string
-	prefix      string
-	claim       string
-}
-
 func main() {
 
 	c, err := parseConfig()
@@ -146,6 +139,8 @@ func main() {
 		provider:                provider,
 	}
 
+	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
+
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
 
@@ -163,17 +158,21 @@ func main() {
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
-		userIDOpts: userIDOpts{
-			header:      c.UserIDHeader,
-			prefix:      c.UserIDPrefix,
-			claim:       c.UserIDClaim,
-			tokenHeader: c.UserIDTokenHeader,
+		idTokenOpts: jwtClaimOpts{
+			userIDClaim: c.UserIDClaim,
+			groupsClaim: c.GroupsClaim,
+		},
+		upstreamHTTPHeaderOpts: httpHeaderOpts{
+			userIDHeader: c.UserIDHeader,
+			userIDPrefix: c.UserIDPrefix,
+			groupsHeader: c.GroupsHeader,
 		},
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
 		strictSessionValidation: c.StrictSessionValidation,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators:          []authenticator.Request{sessionAuthenticator, k8sAuthenticator},
+		authorizers:             []Authorizer{groupsAuthorizer},
 	}
 
 	// Setup complete, mark server ready

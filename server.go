@@ -20,6 +20,7 @@ import (
 const (
 	userSessionCookie       = "authservice_session"
 	userSessionUserID       = "userid"
+	userSessionGroups       = "groups"
 	userSessionClaims       = "claims"
 	userSessionIDToken      = "idtoken"
 	userSessionOAuth2Tokens = "oauth2tokens"
@@ -42,14 +43,31 @@ type server struct {
 	oauth2Config            *oauth2.Config
 	store                   sessions.Store
 	authenticators          []authenticator.Request
+	authorizers             []Authorizer
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
 	sessionMaxAgeSeconds    int
 	strictSessionValidation bool
 	authHeader              string
-	userIDOpts
-	caBundle []byte
+	idTokenOpts             jwtClaimOpts
+	upstreamHTTPHeaderOpts  httpHeaderOpts
+	caBundle                []byte
+}
+
+// jwtClaimOpts specifies the location of the user's identity inside a JWT's
+// claims.
+type jwtClaimOpts struct {
+	userIDClaim string
+	groupsClaim string
+}
+
+// httpHeaderOpts specifies the location of the user's identity inside HTTP
+// headers.
+type httpHeaderOpts struct {
+	userIDHeader string
+	userIDPrefix string
+	groupsHeader string
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +100,25 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		s.authCodeFlowAuthenticationRequest(w, r)
 		return
 	}
-	for k, v := range userInfoToHeaders(userInfo, s.userIDOpts) {
+
+	logger = logger.WithField("user", userInfo)
+	logger.Info("Authorizing request...")
+
+	for i, authz := range s.authorizers {
+		allowed, reason, err := authz.Authorize(r, userInfo)
+		if err != nil {
+			logger.Errorf("Error authorizing request using authorizer %d: %v", i, err)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if !allowed {
+			logger.Infof("Authorizer %d denied the request with reason: '%s'", i, reason)
+			returnMessage(w, http.StatusForbidden, reason)
+			return
+		}
+	}
+
+	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts) {
 		w.Header().Set(k, v)
 	}
 	w.WriteHeader(http.StatusOK)
@@ -182,13 +218,22 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// Extra layer of CSRF protection
 	session.Options.SameSite = http.SameSiteStrictMode
 
-	userID, ok := claims[s.userIDOpts.claim].(string)
+	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
 	if !ok {
-		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.userIDOpts.claim, claims)
-		returnMessage(w, http.StatusInternalServerError, fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.userIDOpts.claim))
+		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.idTokenOpts.userIDClaim, claims)
+		returnMessage(w, http.StatusInternalServerError,
+			fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.idTokenOpts.userIDClaim))
 		return
 	}
+
+	groups := []string{}
+	groupsClaim := claims[s.idTokenOpts.groupsClaim]
+	if groupsClaim != nil {
+		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
+	}
+
 	session.Values[userSessionUserID] = userID
+	session.Values[userSessionGroups] = groups
 	session.Values[userSessionClaims] = claims
 	session.Values[userSessionIDToken] = rawIDToken
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
