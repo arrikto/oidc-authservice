@@ -197,6 +197,8 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	require.Nil(t, err)
 	dexReqID := loginScreen.Query().Get("req")
 	require.NotEmpty(t, dexReqID)
+	_, err = client.Get(loginScreen.String())
+	require.NoError(t, err)
 
 	// Post login credentials
 	data := url.Values{}
@@ -327,7 +329,7 @@ func createK3DCluster() error {
 	// FIXME: Prefer creating a cluster with a random name. Else, try to remove
 	// the cluster before creating it.
 	cmd := exec.Command("k3d", "cluster", "create", "e2e-test-cluster", "--k3s-server-arg",
-	    "--no-deploy=traefik", "--no-lb", "--wait", "--timeout", "5m",
+		"--no-deploy=traefik", "--no-lb", "--wait", "--timeout", "5m",
 		"--update-default-kubeconfig=false")
 	cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
 	err := cmd.Run()
