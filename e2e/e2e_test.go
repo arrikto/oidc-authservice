@@ -31,6 +31,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// testclient is an HTTP client that:
+// - Doesn't follow redirects
+// - Doesn't verify TLS
+//
+// Useful for testing purposes.
+var testClient = &http.Client{
+	// Don't follow redirects automatically
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// Allow self-signed CAs for tests only
+			InsecureSkipVerify: true,
+		},
+	},
+}
+
 type E2ETestSuite struct {
 	suite.Suite
 	kubeclient   client.Client
@@ -128,21 +146,59 @@ func (suite *E2ETestSuite) TestKubernetesLogin() {
 	token := tr.Status.Token
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	client := &http.Client{
-		// Don't follow redirects automatically
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				// Allow self-signed CAs for tests only
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-	resp, err := client.Do(req)
+	httpClient := testClient
+	resp, err := httpClient.Do(req)
 	suite.Require().NoError(err, "HTTP request with k8s auth failed")
 	suite.Require().Equal(http.StatusOK, resp.StatusCode, "Unexpected return code")
+}
+
+func (suite *E2ETestSuite) TestLogout() {
+
+	go func() {
+		suite.T().Log("Starting port-forward...")
+		err := portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
+		if err != nil {
+			log.Fatalf("Port-forward failed: %+v", err)
+		}
+	}()
+	time.Sleep(2 * time.Second)
+	defer func() {
+		suite.T().Log("Stopping port-forward...")
+		suite.stopCh <- struct{}{}
+		time.Sleep(2 * time.Second)
+	}()
+
+	t := suite.T()
+	httpClient := testClient
+
+	// Login and get cookie in order to logout next
+	cookie := login(t, suite.appURL, suite.username, suite.password)
+
+	// Cookie authentication should fail
+	logoutURL := suite.appURL.ResolveReference(mustParseURL("/authservice/logout"))
+	req, err := http.NewRequest(http.MethodPost, logoutURL.String(), nil)
+	require.Nil(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err := httpClient.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+	// Header authentication should succeed
+	req, err = http.NewRequest(http.MethodPost, logoutURL.String(), nil)
+	require.Nil(t, err)
+	bearer := strings.TrimSpace(strings.Split(cookie, "=")[1])
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearer))
+	resp, err = httpClient.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	// User should be logged out now
+	req, err = http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	require.Nil(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err = httpClient.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusFound, resp.StatusCode)
 }
 
 func (suite *E2ETestSuite) TestDexLogin() {
@@ -162,25 +218,27 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	}()
 
 	t := suite.T()
-	client := &http.Client{
-		// Don't follow redirects automatically
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				// Allow self-signed CAs for tests only
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	httpClient := testClient
 
-	appURL := suite.appURL
+	// Get Cookie and make authenticated request
+	cookie := login(t, suite.appURL, suite.username, suite.password)
+	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	require.Nil(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err := httpClient.Do(req)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// login performs an OIDC login and return the session cookie
+func login(t *testing.T, appURL *url.URL, username, password string) string {
+
+	var httpClient = testClient
 
 	// Get the App Page.
 	// This should redirect to the Dex Login page.
-	resp, err := client.Get(appURL.String())
-	require.Nil(t, err)
+	resp, err := httpClient.Get(appURL.String())
+	require.NoError(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
 	// Get state value
@@ -188,7 +246,7 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	authCodeURL := appURL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
 
 	// Start OIDC Flow by hitting the authorization endpoint
-	resp, err = client.Get(authCodeURL.String())
+	resp, err = httpClient.Get(authCodeURL.String())
 	require.Nil(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
@@ -197,70 +255,35 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	require.Nil(t, err)
 	dexReqID := loginScreen.Query().Get("req")
 	require.NotEmpty(t, dexReqID)
-	_, err = client.Get(loginScreen.String())
+	_, err = httpClient.Get(loginScreen.String())
 	require.NoError(t, err)
 
 	// Post login credentials
 	data := url.Values{}
-	data.Set("login", suite.username)
-	data.Set("password", suite.password)
+	data.Set("login", username)
+	data.Set("password", password)
 	req, err := http.NewRequest(http.MethodPost, loginScreen.String(), strings.NewReader(data.Encode()))
 	require.Nil(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-	resp, err = client.Do(req)
+	resp, err = httpClient.Do(req)
 	require.Nil(t, err)
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	// Get approval screen
 	approvalScreen := resp.Request.URL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
-	resp, err = client.Get(approvalScreen.String())
+	resp, err = httpClient.Get(approvalScreen.String())
 	require.Nil(t, err)
 
 	// Get Authorization Code and call the AuthService's redirect url
 	oidcRedirectURL := resp.Request.URL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
-	resp, err = client.Get(oidcRedirectURL.String())
+	resp, err = httpClient.Get(oidcRedirectURL.String())
 	require.Nil(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
 	// Get Cookie and make authenticated request
 	cookie := strings.Split(resp.Header.Get("Set-Cookie"), ";")[0]
-	req, err = http.NewRequest(http.MethodGet, appURL.String(), nil)
-	require.Nil(t, err)
-	req.Header.Set("Cookie", cookie)
-	resp, err = client.Do(req)
-	require.Nil(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	/////////////////
-	// Test Logout //
-	/////////////////
-
-	// Cookie authentication should fail
-	logoutURL := appURL.ResolveReference(mustParseURL("/authservice/logout"))
-	req, err = http.NewRequest(http.MethodPost, logoutURL.String(), nil)
-	require.Nil(t, err)
-	req.Header.Set("Cookie", cookie)
-	resp, err = client.Do(req)
-	require.Nil(t, err)
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-
-	// Header authentication should succeed
-	req, err = http.NewRequest(http.MethodPost, logoutURL.String(), nil)
-	require.Nil(t, err)
-	bearer := strings.TrimSpace(strings.Split(cookie, "=")[1])
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearer))
-	resp, err = client.Do(req)
-	require.Nil(t, err)
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-
-	// User should be logged out now
-	req, err = http.NewRequest(http.MethodGet, appURL.String(), nil)
-	require.Nil(t, err)
-	req.Header.Set("Cookie", cookie)
-	resp, err = client.Do(req)
-	require.Nil(t, err)
-	require.Equal(t, http.StatusFound, resp.StatusCode)
+	return cookie
 }
 
 func waitForStatefulSet(
