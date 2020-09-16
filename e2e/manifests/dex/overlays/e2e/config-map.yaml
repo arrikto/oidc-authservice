@@ -27,3 +27,10 @@ data:
       redirectURIs: [/authservice/oidc/callback]
       name: 'Authservice'
       secret: longrandomvalue
+    # This field depends on a Dex fork. It is used to add groups to
+    # the static user, in order to test the groups authorizer.
+    # https://github.com/candlerb/dex/commit/6a67e7c453a101a7ec3d07fde7b1d8f97b878cc8
+    memberships:
+    - connector: local
+      subject: user
+      groups: [a, b]

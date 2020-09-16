@@ -4,3 +4,7 @@ bases:
 - ../istio
 patchesStrategicMerge:
   - config-map.yaml
+images:
+- name: gcr.io/arrikto/dexidp/dex
+  newName: gcr.io/arrikto/dex
+  newTag: 6a67e7c453a101a7ec3d07fde7b1d8f97b878cc8
