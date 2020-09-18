@@ -22,6 +22,10 @@ data:
       hash: $2y$12$TavNzhPlq8MtjPuaHpsH8.mycv5N03KarLEvteKeX6Pdf/UxEy03m
       username: user
       userID: user
+    - email: user-nogroups
+      hash: $2y$12$TavNzhPlq8MtjPuaHpsH8.mycv5N03KarLEvteKeX6Pdf/UxEy03m
+      username: user-nogroups
+      userID: user-nogroups
     staticClients:
     - id: authservice
       redirectURIs: [/authservice/oidc/callback]

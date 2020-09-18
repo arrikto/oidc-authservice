@@ -220,14 +220,23 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	t := suite.T()
 	httpClient := testClient
 
-	// Get Cookie and make authenticated request
+	// User with groups (login succeeds - can access endpoint)
 	cookie := login(t, suite.appURL, suite.username, suite.password)
 	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Cookie", cookie)
 	resp, err := httpClient.Do(req)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// User without groups (login succeeds - can't access endpoint)
+	cookie = login(t, suite.appURL, fmt.Sprintf("%s-nogroups", suite.username), suite.password)
+	req, err = http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	require.NoError(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err = httpClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 
 // login performs an OIDC login and return the session cookie
