@@ -130,6 +130,14 @@ func main() {
 	}
 
 	// Get OIDC Session Authenticator
+	oauth2Config := &oauth2.Config{
+		ClientID:     c.ClientID,
+		ClientSecret: c.ClientSecret,
+		Endpoint:     endpoint,
+		RedirectURL:  c.RedirectURL.String(),
+		Scopes:       c.OIDCScopes,
+	}
+
 	sessionAuthenticator := &sessionAuthenticator{
 		store:                   store,
 		cookie:                  userSessionCookie,
@@ -137,6 +145,7 @@ func main() {
 		strictSessionValidation: c.StrictSessionValidation,
 		caBundle:                caBundle,
 		provider:                provider,
+		oauth2Config:            oauth2Config,
 	}
 
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
@@ -145,14 +154,8 @@ func main() {
 	// The isReady atomic variable should protect it from concurrency issues.
 
 	*s = server{
-		provider: provider,
-		oauth2Config: &oauth2.Config{
-			ClientID:     c.ClientID,
-			ClientSecret: c.ClientSecret,
-			Endpoint:     endpoint,
-			RedirectURL:  c.RedirectURL.String(),
-			Scopes:       c.OIDCScopes,
-		},
+		provider:     provider,
+		oauth2Config: oauth2Config,
 		// TODO: Add support for Redis
 		store:                  store,
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
