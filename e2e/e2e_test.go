@@ -219,23 +219,66 @@ func (suite *E2ETestSuite) TestDexLogin() {
 
 	t := suite.T()
 	httpClient := testClient
+	appURL := suite.appURL
+	username := suite.username
+	password := suite.password
 
 	// User with groups (login succeeds - can access endpoint)
-	cookie := login(t, suite.appURL, suite.username, suite.password)
-	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	cookie := login(t, appURL, username, password)
+	req, err := http.NewRequest(http.MethodGet, appURL.String(), nil)
 	require.NoError(t, err)
 	req.Header.Set("Cookie", cookie)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// User without groups (login succeeds - can't access endpoint)
-	cookie = login(t, suite.appURL, fmt.Sprintf("%s-nogroups", suite.username), suite.password)
-	req, err = http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	// User without groups (login fails - won't get session)
+	username = fmt.Sprintf("%s-nogroups", username)
+
+	// Get the App Page.
+	// This should redirect to the Dex Login page.
+	resp, err = httpClient.Get(appURL.String())
 	require.NoError(t, err)
-	req.Header.Set("Cookie", cookie)
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+
+	// Get state value
+	t.Log("Getting endpoint")
+	authCodeURL := appURL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
+
+	// Start OIDC Flow by hitting the authorization endpoint
+	resp, err = httpClient.Get(authCodeURL.String())
+	require.Nil(t, err)
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+
+	// Redirected to local auth
+	loginScreen := appURL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
+	require.Nil(t, err)
+	dexReqID := loginScreen.Query().Get("req")
+	require.NotEmpty(t, dexReqID)
+	_, err = httpClient.Get(loginScreen.String())
+	require.NoError(t, err)
+
+	// Post login credentials
+	data := url.Values{}
+	data.Set("login", username)
+	data.Set("password", password)
+	req, err = http.NewRequest(http.MethodPost, loginScreen.String(), strings.NewReader(data.Encode()))
+	require.Nil(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
 	resp, err = httpClient.Do(req)
-	require.NoError(t, err)
+	require.Nil(t, err)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+
+	// Get approval screen
+	approvalScreen := resp.Request.URL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
+	resp, err = httpClient.Get(approvalScreen.String())
+	require.Nil(t, err)
+
+	// Get Authorization Code and call the AuthService's redirect url
+	oidcRedirectURL := resp.Request.URL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
+	resp, err = httpClient.Get(oidcRedirectURL.String())
+	require.Nil(t, err)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	resp, err = httpClient.Get(suite.appURL.String())
 	require.NoError(t, err)

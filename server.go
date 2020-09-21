@@ -254,6 +254,29 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
+	// If the user is not authorized, don't allow them to get a session
+	userInfo := &user.DefaultInfo{Name: userID, Groups: groups}
+	for i, authz := range s.authorizers {
+		allowed, reason, err := authz.Authorize(r, userInfo)
+		if err != nil {
+			logger.Errorf("Error authorizing request using authorizer %d: %v", i, err)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		// If the request is not allowed, try to revoke the user's session.
+		// TODO: Only revoke if the authenticator that provided the identity is
+		// the session authenticator.
+		if !allowed {
+			logger.Infof("Authorizer '%d' denied the request with reason: '%s'. "+
+				"User is not allowed to login.", i, reason)
+			msg := fmt.Sprintf("User '%s' failed authorization with reason: '%s'. "+
+				"Click <a href='%s'> here</a> to login again.", userInfo.GetName(),
+				reason, s.homepageURL)
+			returnHTML(w, http.StatusForbidden, msg)
+			return
+		}
+	}
+
 	session.Values[userSessionUserID] = userID
 	session.Values[userSessionGroups] = groups
 	session.Values[userSessionClaims] = claims
