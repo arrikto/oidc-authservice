@@ -35,9 +35,18 @@ func getUserIP(r *http.Request) string {
 	return strings.Split(r.RemoteAddr, ":")[0]
 }
 
-func returnMessage(w http.ResponseWriter, statusCode int, msg string) {
+func returnHTML(w http.ResponseWriter, statusCode int, html string) {
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(statusCode)
+	_, err := w.Write([]byte(html))
+	if err != nil {
+		log.Errorf("Failed to write body: %v", err)
+	}
+}
+
+func returnMessage(w http.ResponseWriter, statusCode int, msg string) {
 	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(statusCode)
 	_, err := w.Write([]byte(msg))
 	if err != nil {
 		log.Errorf("Failed to write body: %v", err)
@@ -45,18 +54,22 @@ func returnMessage(w http.ResponseWriter, statusCode int, msg string) {
 }
 
 func returnJSONMessage(w http.ResponseWriter, statusCode int, jsonMsg interface{}) {
-	w.WriteHeader(statusCode)
-	w.Header().Set("Content-Type", "application/json")
 	jsonBytes, err := json.Marshal(jsonMsg)
 	if err != nil {
 		log.Errorf("Failed to marshal struct to json: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 	_, err = w.Write(jsonBytes)
 	if err != nil {
 		log.Errorf("Failed to write body: %v", err)
 	}
+}
+
+func deleteCookie(w http.ResponseWriter, name string) {
+	http.SetCookie(w, &http.Cookie{Name: name, MaxAge: -1, Path: "/"})
 }
 
 func createNonce(length int) string {

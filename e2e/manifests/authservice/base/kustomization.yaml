@@ -7,6 +7,7 @@ resources:
 - envoy-filter.yaml
 - pvc.yaml
 - rbac.yaml
+- virtualservice.yaml
 
 namespace: istio-system
 

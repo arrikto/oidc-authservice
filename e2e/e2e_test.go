@@ -237,6 +237,9 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	resp, err = httpClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	resp, err = httpClient.Get(suite.appURL.String())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusFound, resp.StatusCode)
 }
 
 // login performs an OIDC login and return the session cookie
@@ -290,7 +293,7 @@ func login(t *testing.T, appURL *url.URL, username, password string) string {
 	require.Nil(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
-	// Get Cookie and make authenticated request
+	// Get Cookie
 	cookie := strings.Split(resp.Header.Get("Set-Cookie"), ";")[0]
 	return cookie
 }
