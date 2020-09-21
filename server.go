@@ -5,7 +5,9 @@ package main
 import (
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	oidc "github.com/coreos/go-oidc"
@@ -111,9 +113,29 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
+		// If the request is not allowed, try to revoke the user's session.
+		// TODO: Only revoke if the authenticator that provided the identity is
+		// the session authenticator.
 		if !allowed {
-			logger.Infof("Authorizer %d denied the request with reason: '%s'", i, reason)
-			returnMessage(w, http.StatusForbidden, reason)
+			logger.Infof("Authorizer '%d' denied the request with reason: '%s'", i, reason)
+			deleteCookie(w, userSessionCookie)
+			respRecorder := httptest.NewRecorder()
+			s.logout(respRecorder, r.Clone(r.Context()))
+			resp := respRecorder.Result()
+			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusUnauthorized {
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					logger.Errorf("Failed to read logout response body: %v", err)
+				}
+				logger.Errorf("Failed to revoke session after authorization fail. "+
+					"Status: '%d'. Body: '%s'", resp.StatusCode, string(body))
+			}
+			// TODO: Move this to the web server and make it prettier
+			msg := fmt.Sprintf("User '%s' failed authorization with reason: '%s'. "+
+				"Click <a href='%s'> here</a> to login again.", userInfo.GetName(),
+				reason, s.homepageURL)
+
+			returnHTML(w, http.StatusForbidden, msg)
 			return
 		}
 	}
@@ -198,14 +220,14 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// UserInfo endpoint to get claims
 	claims := map[string]interface{}{}
-	userInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
+	oidcUserInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
 		return
 	}
 
-	if err = userInfo.Claims(&claims); err != nil {
+	if err = oidcUserInfo.Claims(&claims); err != nil {
 		logger.Errorf("Problem getting userinfo claims: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
 		return

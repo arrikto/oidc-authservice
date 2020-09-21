@@ -5,3 +5,5 @@ varReference:
   kind: EnvoyFilter
 - path: spec/configPatches/patch/value/config/http_service/server_uri/cluster
   kind: EnvoyFilter
+- path: spec/http/route/destination/host
+  kind: VirtualService
