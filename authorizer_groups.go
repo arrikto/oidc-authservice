@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -45,6 +46,7 @@ func (ga *groupsAuthorizer) Authorize(r *http.Request, userinfo user.Info) (bool
 			return true, "", nil
 		}
 	}
-	reason := fmt.Sprintf("User's groups ('%v') are not in allowlist.", userinfo.GetGroups())
+	reason := fmt.Sprintf("User's groups ([%s]) are not in allowlist.",
+		strings.Join(userinfo.GetGroups(), ","))
 	return false, reason, nil
 }

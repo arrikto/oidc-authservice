@@ -37,21 +37,10 @@ type sessionAuthenticator struct {
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
 	logger := loggerForRequest(r)
 
-	// Check header for auth information.
-	// Adding it to a cookie to treat both cases uniformly.
-	// This is also required by the gorilla/sessions package.
-	bearer := getBearerToken(r.Header.Get(sa.header))
-	if len(bearer) != 0 {
-		r.AddCookie(&http.Cookie{
-			Name:   userSessionCookie,
-			Value:  bearer,
-			Path:   "/",
-			MaxAge: 1,
-		})
-	}
+	// Get session from header or cookie
+	session, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
 
 	// Check if user session is valid
-	session, err := sa.store.Get(r, sa.cookie)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "couldn't get user session")
 	}
@@ -75,19 +64,12 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			}
 			// Access token has expired
 			logger.Info("UserInfo token has expired")
-			session.Options.MaxAge = -1
-			if err := sessions.Save(r, httptest.NewRecorder()); err != nil {
-				logger.Errorf("Couldn't delete user session: %v", err)
-			}
-			// Try to revoke token, just in case. According to the spec,
-			// trying to revoke an invalid token should return an OK response:
-			// https://tools.ietf.org/html/rfc7009#section-2.2
-			_revocationEndpoint, err := revocationEndpoint(sa.provider)
-			if err != nil {
-				logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
-			}
-			err = revokeTokens(ctx, _revocationEndpoint, &token,
-				sa.oauth2Config.ClientID, sa.oauth2Config.ClientSecret)
+			// XXX: With the current abstraction, an authenticator doesn't have
+			// access to the ResponseWriter and thus can't set a cookie. This
+			// means that the cookie will remain at the user's browser but it
+			// will be replaced after the user logs in again.
+			err = revokeSession(ctx, httptest.NewRecorder(), session,
+				sa.provider, sa.oauth2Config, sa.caBundle)
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
 			}
@@ -96,7 +78,8 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	}
 
 	// Data written at a previous version might not have groups stored, so
-	// default it.
+	// default to an empty list of strings.
+	// TODO: Consolidate all session serialization/deserialization in one place.
 	groups, ok := session.Values[userSessionGroups].([]string)
 	if !ok {
 		groups = []string{}
