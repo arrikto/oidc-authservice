@@ -5,9 +5,7 @@ package main
 import (
 	"encoding/gob"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 
 	oidc "github.com/coreos/go-oidc"
@@ -17,15 +15,6 @@ import (
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-)
-
-const (
-	userSessionCookie       = "authservice_session"
-	userSessionUserID       = "userid"
-	userSessionGroups       = "groups"
-	userSessionClaims       = "claims"
-	userSessionIDToken      = "idtoken"
-	userSessionOAuth2Tokens = "oauth2tokens"
 )
 
 var (
@@ -118,20 +107,18 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		// the session authenticator.
 		if !allowed {
 			logger.Infof("Authorizer '%d' denied the request with reason: '%s'", i, reason)
-			deleteCookie(w, userSessionCookie)
-			respRecorder := httptest.NewRecorder()
-			s.logout(respRecorder, r.Clone(r.Context()))
-			resp := respRecorder.Result()
-			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusUnauthorized {
-				body, err := ioutil.ReadAll(resp.Body)
+			session, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
+			if err != nil {
+				logger.Errorf("Error getting session for request: %v", err)
+			}
+			if !session.IsNew {
+				err = revokeSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
 				if err != nil {
-					logger.Errorf("Failed to read logout response body: %v", err)
+					logger.Errorf("Failed to revoke session after authorization fail: %v", err)
 				}
-				logger.Errorf("Failed to revoke session after authorization fail. "+
-					"Status: '%d'. Body: '%s'", resp.StatusCode, string(body))
 			}
 			// TODO: Move this to the web server and make it prettier
-			msg := fmt.Sprintf("User '%s' failed authorization with reason: '%s'. "+
+			msg := fmt.Sprintf("User '%s' failed authorization with reason: %s. "+
 				"Click <a href='%s'> here</a> to login again.", userInfo.GetName(),
 				reason, s.homepageURL)
 
@@ -281,20 +268,16 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
 	logger := loggerForRequest(r)
 
-	// Clear all cookies, only header auth allowed for this endpoint
-	r.Header.Set("Cookie", "")
-	bearer := getBearerToken(r.Header.Get(s.authHeader))
-	if len(bearer) != 0 {
-		r.AddCookie(&http.Cookie{
-			Name:   userSessionCookie,
-			Value:  bearer,
-			Path:   "/",
-			MaxAge: 1,
-		})
+	// Only header auth allowed for this endpoint
+	sessionID := getBearerToken(r.Header.Get(s.authHeader))
+	if sessionID == "" {
+		logger.Errorf("Request doesn't have a session value in header '%s'", s.authHeader)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
 	// Revoke user session.
-	session, err := s.store.Get(r, userSessionCookie)
+	session, err := sessionFromID(sessionID, s.store)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -305,36 +288,22 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	logger = logger.WithField("userid", session.Values[userSessionUserID].(string))
 
-	// Check if the provider has a revocation_endpoint
-	_revocationEndpoint, err := revocationEndpoint(s.provider)
+	err = revokeSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
 	if err != nil {
-		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
-	} else {
-		ctx := setTLSContext(r.Context(), s.caBundle)
-		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		err := revokeTokens(ctx, _revocationEndpoint, &token, s.oauth2Config.ClientID, s.oauth2Config.ClientSecret)
-		if err != nil {
-			logger.Errorf("Error revoking tokens: %v", err)
-			statusCode := http.StatusInternalServerError
-			// If the server returned 503, return it as well as the client might want to retry
-			if reqErr, ok := errors.Cause(err).(*requestError); ok {
-				if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
-					statusCode = reqErr.Response.StatusCode
-				}
+		logger.Errorf("Error revoking tokens: %v", err)
+		statusCode := http.StatusInternalServerError
+		// If the server returned 503, return it as well as the client might want to retry
+		if reqErr, ok := errors.Cause(err).(*requestError); ok {
+			if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
+				statusCode = reqErr.Response.StatusCode
 			}
-			returnMessage(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
-			return
 		}
-		logger.WithField("userid", session.Values[userSessionUserID].(string)).Info("Access/Refresh tokens revoked")
-	}
-
-	session.Options.MaxAge = -1
-	if err := sessions.Save(r, w); err != nil {
-		logger.Errorf("Couldn't delete user session: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Couldn't delete user session")
+		returnMessage(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
 		return
 	}
+
 	logger.Info("Successful logout.")
 	resp := struct {
 		AfterLogoutURL string `json:"afterLogoutURL"`
