@@ -242,6 +242,59 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 }
 
+// TestStrictSessionValidation validates the STRICT_SESSION_VALIDATION mode of
+// the AuthService. In this mode, the AuthService will validate the user's
+// acccess token on every request.
+func (suite *E2ETestSuite) TestStrictSessionValidation() {
+
+	// Port-forward the istio-ingressgateway for this test
+	go func() {
+		suite.T().Log("Starting port-forward...")
+		err := portForward("service", "istio-system", "istio-ingressgateway", "8080", "80", suite.stopCh)
+		if err != nil {
+			log.Fatalf("Port-forward failed: %+v", err)
+		}
+	}()
+	time.Sleep(2 * time.Second)
+	defer func() {
+		suite.T().Log("Stopping port-forward...")
+		suite.stopCh <- struct{}{}
+		time.Sleep(2 * time.Second)
+	}()
+
+	t := suite.T()
+	httpClient := testClient
+
+	// Login and access workload
+	cookie := login(t, suite.appURL, suite.username, suite.password)
+	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
+	require.NoError(t, err)
+	req.Header.Set("Cookie", cookie)
+	resp, err := httpClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Revoke all Dex tokens
+	err = exec.Command("kubectl", "delete", "signingkeies.dex.coreos.com",
+		"--all", "-n", "auth").Run()
+	require.NoError(t, err, "Error deleting Dex's signing keys")
+	err = exec.Command("kubectl", "delete", "pods", "-n", "auth", "-l",
+		"app=dex").Run()
+	require.NoError(t, err, "Error deleting Dex's pods")
+	err = waitForDeployment(suite.kubeclient, "auth", "dex", time.Minute, 5*time.Second)
+	require.NoError(t, err)
+	err = exec.Command("kubectl", "delete", "pods", "-n", "istio-system", "-l",
+		"app=authservice").Run()
+	require.NoError(t, err, "Error deleting AuthService's pods")
+	err = waitForStatefulSet(suite.kubeclient, "istio-system", "authservice", time.Minute, 5*time.Second)
+	require.NoError(t, err)
+
+	// Access workload again
+	resp, err = httpClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+}
+
 // login performs an OIDC login and return the session cookie
 func login(t *testing.T, appURL *url.URL, username, password string) string {
 
