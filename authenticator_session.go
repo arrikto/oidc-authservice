@@ -95,10 +95,17 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		}
 	}
 
+	// Data written at a previous version might not have groups stored, so
+	// default it.
+	groups, ok := session.Values[userSessionGroups].([]string)
+	if !ok {
+		groups = []string{}
+	}
+
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   session.Values[userSessionUserID].(string),
-			Groups: session.Values[userSessionGroups].([]string),
+			Groups: groups,
 		},
 	}
 	return resp, true, nil
