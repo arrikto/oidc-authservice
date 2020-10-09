@@ -176,7 +176,15 @@ func main() {
 		caBundle:                caBundle,
 		authenticators:          []authenticator.Request{sessionAuthenticator, k8sAuthenticator},
 		authorizers:             []Authorizer{groupsAuthorizer},
-		sessionSameSite:         c.SessionSameSite,
+	}
+	switch c.SessionSameSite {
+	case "None":
+		s.sessionSameSite = http.SameSiteNoneMode
+	case "Strict":
+		s.sessionSameSite = http.SameSiteStrictMode
+	default:
+		// Use Lax mode as defauls
+		s.sessionSameSite = http.SameSiteLaxMode
 	}
 
 	// Setup complete, mark server ready
