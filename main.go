@@ -172,6 +172,7 @@ func main() {
 		},
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
 		strictSessionValidation: c.StrictSessionValidation,
+		sessionDomain:           c.SessionDomain,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators:          []authenticator.Request{sessionAuthenticator, k8sAuthenticator},

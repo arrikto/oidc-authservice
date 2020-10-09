@@ -38,6 +38,7 @@ type server struct {
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
+	sessionDomain           string
 	sessionMaxAgeSeconds    int
 	strictSessionValidation bool
 	authHeader              string
@@ -227,6 +228,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
+	session.Options.Domain = s.sessionDomain
 
 	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
 	if !ok {
