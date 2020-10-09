@@ -57,6 +57,7 @@ type SessionStore struct {
 	store                    sessions.Store
 	authHeader               string
 	sessionCookie            string
+	sessionDomain            string
 	userIDClaim, groupsClaim string
 	sessionMaxAgeSeconds     int
 	sessionSameSite          http.SameSite
@@ -66,6 +67,7 @@ func NewSessionStore(
 	store sessions.Store,
 	authHeader string,
 	sessionCookie string,
+	sessionDomain string,
 	userIDClaim, groupsClaim string,
 	sessionMaxAgeSeconds int,
 	sessionSameSiteCfg string) SessionStore {
@@ -82,6 +84,7 @@ func NewSessionStore(
 		store:                store,
 		authHeader:           authHeader,
 		sessionCookie:        sessionCookie,
+		sessionDomain:        sessionDomain,
 		userIDClaim:          userIDClaim,
 		groupsClaim:          groupsClaim,
 		sessionMaxAgeSeconds: sessionMaxAgeSeconds,
@@ -129,6 +132,7 @@ func (s *SessionStore) NewSession(
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
+	session.Options.Domain = s.sessionDomain
 
 	userID, err := claims.UserID()
 	if err != nil {

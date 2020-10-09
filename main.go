@@ -154,6 +154,7 @@ func main() {
 		store,
 		c.AuthHeader,
 		oidc.UserSessionCookie,
+		c.SessionDomain,
 		c.UserIDClaim,
 		c.GroupsClaim,
 		c.SessionMaxAge,
@@ -188,8 +189,11 @@ func main() {
 
 	*s = server{
 		// TODO: Add support for Redis
-		sessionStore:           sessionStore,
-		oidcStateStore:         oidc.NewOidcStateStore(oidcStateStore),
+		sessionStore: sessionStore,
+		oidcStateStore: oidc.NewOidcStateStore(
+			oidcStateStore,
+			c.SessionDomain,
+		),
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),

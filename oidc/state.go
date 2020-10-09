@@ -27,7 +27,8 @@ func init() {
 }
 
 type OidcStateStore struct {
-	store sessions.Store
+	store           sessions.Store
+	sessionDomain   string
 }
 
 type State struct {
@@ -36,9 +37,12 @@ type State struct {
 	FirstVisitedURL string
 }
 
-func NewOidcStateStore(store sessions.Store) OidcStateStore {
+func NewOidcStateStore(
+	store sessions.Store,
+	sessionDomain string) OidcStateStore {
 	return OidcStateStore{
-		store: store,
+		store:           store,
+		sessionDomain:   sessionDomain,
 	}
 }
 
@@ -93,6 +97,7 @@ func (s *OidcStateStore) CreateState(r *http.Request, w http.ResponseWriter) err
 	session := sessions.NewSession(s.store, OidcStateCookie)
 	session.Options.MaxAge = int(20 * time.Minute)
 	session.Options.Path = "/"
+	session.Options.Domain = s.sessionDomain
 	session.Values[SessionValueState] = *state
 
 	return session.Save(r, w)
