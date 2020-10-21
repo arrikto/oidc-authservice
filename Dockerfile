@@ -2,7 +2,7 @@
 # Builder Image #
 #################
 
-FROM golang:1.14.1 as builder
+FROM golang:1.15.3-alpine3.12 as builder
 
 ENV GO111MODULE=on
 WORKDIR /go/src/oidc-authservice
@@ -19,8 +19,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /go
 # Release Image #
 #################
 
-FROM alpine:3.10
-RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+FROM alpine:3.12
+RUN apk add --no-cache ca-certificates
 
 ENV USER=authservice
 ENV GROUP=authservice
