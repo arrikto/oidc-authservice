@@ -3,11 +3,12 @@
 package main
 
 import (
-	"github.com/gorilla/sessions"
-	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httptest"
 	"time"
+
+	"github.com/gorilla/sessions"
+	"github.com/pkg/errors"
 )
 
 const oidcLoginSessionCookie = "non_existent_cookie"
@@ -44,7 +45,14 @@ func load(store sessions.Store, id string) (*state, error) {
 // save persists a state to the store and returns the entry's id.
 func (s *state) save(store sessions.Store) (string, error) {
 	session := sessions.NewSession(store, oidcLoginSessionCookie)
-	session.ID = createNonce(16)
+	var err error
+	// Nonce has 64 different characters. So 2^6 possibilities per character.
+	// Total bits of randomness are 6*length. For at least 256 bits of
+	// randomness, we need ceil(256/6)=43 characters.
+	session.ID, err = createNonce(43)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate a random session ID")
+	}
 	session.Options.MaxAge = int(time.Hour)
 	session.Values["origURL"] = s.origURL
 
@@ -52,7 +60,7 @@ func (s *state) save(store sessions.Store) (string, error) {
 	// to set the session ID.
 	// Because of that, we have to retrieve it from the cookie value.
 	w := httptest.NewRecorder()
-	err := session.Save(&http.Request{}, w)
+	err = session.Save(&http.Request{}, w)
 	if err != nil {
 		return "", errors.Wrap(err, "error trying to save session")
 	}

@@ -17,8 +17,10 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/yosssi/boltstore v1.0.1-0.20150916121936-36632d491655
-	golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2 // indirect
+	golang.org/x/exp v0.0.0-20201008143054-e3b2a7f2fdc7 // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+	golang.org/x/tools v0.0.0-20201022035929-9cf592e881e9 // indirect
+	gonum.org/v1/gonum v0.8.1
 	gopkg.in/square/go-jose.v2 v2.3.1 // indirect
 	k8s.io/api v0.18.2
 	k8s.io/apimachinery v0.18.2
