@@ -44,7 +44,11 @@ func load(store sessions.Store, id string) (*state, error) {
 // save persists a state to the store and returns the entry's id.
 func (s *state) save(store sessions.Store) (string, error) {
 	session := sessions.NewSession(store, oidcLoginSessionCookie)
-	session.ID = createNonce(16)
+	var err error
+	session.ID, err = createNonce(16)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate a random session ID")
+	}
 	session.Options.MaxAge = int(time.Hour)
 	session.Values["origURL"] = s.origURL
 
@@ -52,7 +56,7 @@ func (s *state) save(store sessions.Store) (string, error) {
 	// to set the session ID.
 	// Because of that, we have to retrieve it from the cookie value.
 	w := httptest.NewRecorder()
-	err := session.Save(&http.Request{}, w)
+	err = session.Save(&http.Request{}, w)
 	if err != nil {
 		return "", errors.Wrap(err, "error trying to save session")
 	}
