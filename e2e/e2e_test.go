@@ -178,7 +178,7 @@ func (suite *E2ETestSuite) TestLogout() {
 	logoutURL := suite.appURL.ResolveReference(mustParseURL("/authservice/logout"))
 	req, err := http.NewRequest(http.MethodPost, logoutURL.String(), nil)
 	require.Nil(t, err)
-	req.Header.Set("Cookie", cookie)
+	req.AddCookie(cookie)
 	resp, err := httpClient.Do(req)
 	require.Nil(t, err)
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -186,7 +186,7 @@ func (suite *E2ETestSuite) TestLogout() {
 	// Header authentication should succeed
 	req, err = http.NewRequest(http.MethodPost, logoutURL.String(), nil)
 	require.Nil(t, err)
-	bearer := strings.TrimSpace(strings.Split(cookie, "=")[1])
+	bearer := cookie.Value
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", bearer))
 	resp, err = httpClient.Do(req)
 	require.Nil(t, err)
@@ -195,7 +195,7 @@ func (suite *E2ETestSuite) TestLogout() {
 	// User should be logged out now
 	req, err = http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
 	require.Nil(t, err)
-	req.Header.Set("Cookie", cookie)
+	req.AddCookie(cookie)
 	resp, err = httpClient.Do(req)
 	require.Nil(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
@@ -224,7 +224,7 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	cookie := login(t, suite.appURL, suite.username, suite.password)
 	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
 	require.NoError(t, err)
-	req.Header.Set("Cookie", cookie)
+	req.AddCookie(cookie)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -233,7 +233,7 @@ func (suite *E2ETestSuite) TestDexLogin() {
 	cookie = login(t, suite.appURL, fmt.Sprintf("%s-nogroups", suite.username), suite.password)
 	req, err = http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
 	require.NoError(t, err)
-	req.Header.Set("Cookie", cookie)
+	req.AddCookie(cookie)
 	resp, err = httpClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -269,7 +269,7 @@ func (suite *E2ETestSuite) TestStrictSessionValidation() {
 	cookie := login(t, suite.appURL, suite.username, suite.password)
 	req, err := http.NewRequest(http.MethodGet, suite.appURL.String(), nil)
 	require.NoError(t, err)
-	req.Header.Set("Cookie", cookie)
+	req.AddCookie(cookie)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -296,7 +296,7 @@ func (suite *E2ETestSuite) TestStrictSessionValidation() {
 }
 
 // login performs an OIDC login and return the session cookie
-func login(t *testing.T, appURL *url.URL, username, password string) string {
+func login(t *testing.T, appURL *url.URL, username, password string) *http.Cookie {
 
 	var httpClient = testClient
 
@@ -306,9 +306,10 @@ func login(t *testing.T, appURL *url.URL, username, password string) string {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
-	// Get state value
+	// Get state cookie
 	t.Log("Getting endpoint")
 	authCodeURL := appURL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
+	stateCookie := resp.Cookies()
 
 	// Start OIDC Flow by hitting the authorization endpoint
 	resp, err = httpClient.Get(authCodeURL.String())
@@ -342,13 +343,24 @@ func login(t *testing.T, appURL *url.URL, username, password string) string {
 
 	// Get Authorization Code and call the AuthService's redirect url
 	oidcRedirectURL := resp.Request.URL.ResolveReference(mustParseURL(resp.Header.Get("Location")))
-	resp, err = httpClient.Get(oidcRedirectURL.String())
+	req, err = http.NewRequest(http.MethodGet, oidcRedirectURL.String(), nil)
+	require.Nil(t, err)
+	// Add cookie for state CSRF
+	for _, c := range stateCookie {
+		req.AddCookie(c)
+	}
+	resp, err = httpClient.Do(req)
 	require.Nil(t, err)
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
 	// Get Cookie
-	cookie := strings.Split(resp.Header.Get("Set-Cookie"), ";")[0]
-	return cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == "authservice_session" {
+			return c
+		}
+	}
+	t.Fatalf("Session cookie not found")
+	return nil
 }
 
 func waitForStatefulSet(

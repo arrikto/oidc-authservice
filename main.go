@@ -10,14 +10,12 @@ import (
 	"path"
 	"time"
 
-	"github.com/boltdb/bolt"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
-	"github.com/yosssi/boltstore/reaper"
-	"github.com/yosssi/boltstore/store"
+	"github.com/yosssi/boltstore/shared"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -105,19 +103,23 @@ func main() {
 		endpoint.AuthURL = c.OIDCAuthURL.String()
 	}
 
-	// Setup Store
+	// Setup session store
 	// Using BoltDB by default
-	db, err := bolt.Open(c.SessionStorePath, 0666, nil)
-	if err != nil {
-		log.Fatalf("Error opening bolt store: %v", err)
-	}
-	defer db.Close()
-	// Invoke a reaper which checks and removes expired sessions periodically.
-	defer reaper.Quit(reaper.Run(db, reaper.Options{}))
-	store, err := store.New(db, store.Config{}, []byte(secureCookieKeyPair))
+	store, err := newBoltDBSessionStore(c.SessionStorePath,
+		shared.DefaultBucketName, false)
 	if err != nil {
 		log.Fatalf("Error creating session store: %v", err)
 	}
+	defer store.Close()
+
+	// Setup state store
+	// Using BoltDB by default
+	oidcStateStore, err := newBoltDBSessionStore(c.OIDCStateStorePath,
+		"oidc_state", true)
+	if err != nil {
+		log.Fatalf("Error creating oidc state store: %v", err)
+	}
+	defer oidcStateStore.Close()
 
 	// Get Kubernetes authenticator
 	restConfig, err := clientconfig.GetConfig()
@@ -158,6 +160,7 @@ func main() {
 		oauth2Config: oauth2Config,
 		// TODO: Add support for Redis
 		store:                  store,
+		oidcStateStore:         oidcStateStore,
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),

@@ -95,6 +95,7 @@ Session store-related settings:
 | Setting | Default | Description |
 | - | - | - |
 | `SESSION_STORE_PATH` | "/var/lib/authservice/data.db" | Path to local session store. Backed by BoltDB. |
+| `OIDC_STATE_STORE_PATH` | "/var/lib/authservice/oidc_state.db" | Path to the session store used to save the sessions for the OIDC state parameter. |
 | `SESSION_MAX_AGE` | "86400" | Time in seconds after which sessions expire. Defaults to a day (24h). |
 | `SESSION_SAME_SITE` | "Lax" | SameSite attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite). Its value can be "None", "Lax" or "Strict". |
 

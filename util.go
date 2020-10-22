@@ -12,12 +12,25 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
+
+func realpath(path string) (string, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
 
 func loggerForRequest(r *http.Request) *log.Entry {
 	return log.WithContext(r.Context()).WithFields(log.Fields{
