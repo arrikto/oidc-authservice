@@ -33,6 +33,7 @@ type server struct {
 	provider                *oidc.Provider
 	oauth2Config            *oauth2.Config
 	store                   sessions.Store
+	oidcStateStore          sessions.Store
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
 	afterLoginRedirectURL   string
@@ -113,7 +114,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 				logger.Errorf("Error getting session for request: %v", err)
 			}
 			if !session.IsNew {
-				err = revokeSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+				err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
 				if err != nil {
 					logger.Errorf("Failed to revoke session after authorization fail: %v", err)
 				}
@@ -140,15 +141,14 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 	logger := loggerForRequest(r)
 
 	// Initiate OIDC Flow with Authorization Request.
-	state := newState(r.URL.String())
-	id, err := state.save(s.store)
+	state, err := createState(r, w, s.oidcStateStore)
 	if err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
 
-	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(id), http.StatusFound)
+	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(state), http.StatusFound)
 }
 
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
@@ -175,10 +175,13 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If state is loaded, then it's correct, as it is saved by its id.
-	state, err := load(s.store, stateID)
+	state, err := verifyState(r, w, s.oidcStateStore)
 	if err != nil {
-		logger.Errorf("Failed to retrieve state from store: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Failed to retrieve state.")
+		logger.Errorf("Failed to verify state parameter: %v", err)
+		returnMessage(w, http.StatusBadRequest, "CSRF check failed."+
+			" This may happen if you opened the login form in more than 1"+
+			" tabs. Please try to login again.")
+		return
 	}
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
@@ -255,8 +258,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("Login validated with ID token, redirecting.")
 
-	// Getting original destination from DB with state
-	var destination = state.origURL
+	// Getting the firstVisitedURL from the OIDC state
+	var destination = state.FirstVisitedURL
 	if s.afterLoginRedirectURL != "" {
 		destination = s.afterLoginRedirectURL
 	}
@@ -291,7 +294,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	logger = logger.WithField("userid", session.Values[userSessionUserID].(string))
 
-	err = revokeSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+	err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
 	if err != nil {
 		logger.Errorf("Error revoking tokens: %v", err)
 		statusCode := http.StatusInternalServerError
