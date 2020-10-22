@@ -50,10 +50,28 @@ func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	return store.Get(r, cookie)
 }
 
-// revokeSession revokes the given session
+// revokeSession revokes the given session.
+func revokeSession(ctx context.Context, w http.ResponseWriter,
+	session *sessions.Session) error {
+
+	// Delete the session by setting its MaxAge to a negative number.
+	// This will delete the session from the store and also add a "Set-Cookie"
+	// header that will instruct the browser to delete it.
+	// XXX: The session.Save function doesn't really need the request, but only
+	// uses it for its context.
+	session.Options.MaxAge = -1
+	r := &http.Request{}
+	if err := session.Save(r.WithContext(ctx), w); err != nil {
+		return errors.Wrap(err, "Couldn't delete user session")
+	}
+	return nil
+}
+
+// revokeOIDCSession revokes the given session, which is assumed to be an OIDC
+// session, for which it also performs the necessary cleanup.
 // TODO: In the future, we may want to make this function take a function as
 // input, instead of polluting it with extra arguments.
-func revokeSession(ctx context.Context, w http.ResponseWriter,
+func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	session *sessions.Session, provider *oidc.Provider,
 	oauth2Config *oauth2.Config, caBundle []byte) error {
 
@@ -73,15 +91,5 @@ func revokeSession(ctx context.Context, w http.ResponseWriter,
 		logger.WithField("userid", session.Values[userSessionUserID].(string)).Info("Access/Refresh tokens revoked")
 	}
 
-	// Delete the session by setting its MaxAge to a negative number.
-	// This will delete the session from the store and also add a "Set-Cookie"
-	// header that will instruct the browser to delete it.
-	// XXX: The session.Save function doesn't really need the request, but only
-	// uses it for its context.
-	session.Options.MaxAge = -1
-	r := &http.Request{}
-	if err := session.Save(r.WithContext(ctx), w); err != nil {
-		return errors.Wrap(err, "Couldn't delete user session")
-	}
-	return nil
+	return revokeSession(ctx, w, session)
 }

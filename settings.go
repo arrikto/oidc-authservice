@@ -19,6 +19,7 @@ type config struct {
 	RedirectURL             *url.URL `split_words:"true"`
 	OIDCScopes              []string `split_words:"true" default:"openid,email"`
 	StrictSessionValidation bool     `split_words:"true"`
+	OIDCStateStorePath      string   `split_words:"true" default:"/var/lib/authservice/oidc_state.db"`
 
 	// General
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`

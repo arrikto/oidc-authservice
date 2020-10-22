@@ -3,65 +3,103 @@
 package main
 
 import (
+	"encoding/gob"
+	"net/http"
+	"time"
+
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
-	"net/http"
-	"net/http/httptest"
-	"time"
 )
 
-const oidcLoginSessionCookie = "non_existent_cookie"
+const (
+	oidcStateCookie = "oidc_state_csrf"
+)
 
-type state struct {
-	origURL string
+func init() {
+	gob.Register(State{})
+
 }
 
-func newState(origURL string) *state {
-	return &state{
-		origURL: origURL,
+type State struct {
+	// FirstVisitedURL is the URL that the user visited when we redirected them
+	// to login.
+	FirstVisitedURL string
+}
+
+func newState(firstVisitedURL string) *State {
+	return &State{
+		FirstVisitedURL: firstVisitedURL,
 	}
 }
 
-// load retrieves a state from the store given its id.
-func load(store sessions.Store, id string) (*state, error) {
-	// Make a fake request so that the store will find the cookie
-	r := &http.Request{Header: make(http.Header)}
-	r.AddCookie(&http.Cookie{Name: oidcLoginSessionCookie, Value: id, MaxAge: 10})
+// createState creates the state parameter from the incoming request, stores
+// it in the session store and sets a cookie with the session key.
+// It returns the session key, which can be used as the state value to start
+// an OIDC authentication request.
+func createState(r *http.Request, w http.ResponseWriter,
+	store sessions.Store) (string, error) {
 
-	session, err := store.Get(r, oidcLoginSessionCookie)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if session.IsNew {
-		return nil, errors.New("session does not exist")
-	}
-
-	return &state{
-		origURL: session.Values["origURL"].(string),
-	}, nil
-}
-
-// save persists a state to the store and returns the entry's id.
-func (s *state) save(store sessions.Store) (string, error) {
-	session := sessions.NewSession(store, oidcLoginSessionCookie)
+	s := newState(r.URL.Path)
+	session := sessions.NewSession(store, oidcStateCookie)
 	session.ID = createNonce(16)
-	session.Options.MaxAge = int(time.Hour)
-	session.Values["origURL"] = s.origURL
+	session.Options.MaxAge = int(20 * time.Minute)
+	session.Values["state"] = *s
 
-	// The current gorilla/sessions Store interface doesn't allow us
-	// to set the session ID.
-	// Because of that, we have to retrieve it from the cookie value.
-	w := httptest.NewRecorder()
 	err := session.Save(&http.Request{}, w)
 	if err != nil {
 		return "", errors.Wrap(err, "error trying to save session")
 	}
+
 	// Cookie is persisted in ResponseWriter, make a request to parse it.
-	r := &http.Request{Header: make(http.Header)}
-	r.Header.Set("Cookie", w.Header().Get("Set-Cookie"))
-	c, err := r.Cookie(oidcLoginSessionCookie)
+	tempReq := &http.Request{Header: make(http.Header)}
+	tempReq.Header.Set("Cookie", w.Header().Get("Set-Cookie"))
+	c, err := tempReq.Cookie(oidcStateCookie)
 	if err != nil {
 		return "", errors.Wrap(err, "error trying to save session")
 	}
 	return c.Value, nil
+}
+
+// verifyState gets the state from the cookie 'initState' saved. It also gets
+// the state from an http param and:
+// 1. Confirms the two values match.
+// 2. Confirms we issued the state value by decoding it.
+//
+// Finally, it returns the decoded state value.
+func verifyState(r *http.Request, w http.ResponseWriter,
+	store sessions.Store) (*State, error) {
+
+	// Get the state from the HTTP param.
+	var stateParam = r.FormValue("state")
+	if len(stateParam) == 0 {
+		return nil, errors.New("Missing url parameter: state")
+	}
+
+	// Get the state from the cookie the user-agent sent.
+	stateCookie, err := r.Cookie(oidcStateCookie)
+	if err != nil {
+		return nil, errors.Errorf("Missing cookie: '%s'", oidcStateCookie)
+	}
+
+	// Confirm the two values match.
+	if stateParam != stateCookie.Value {
+		return nil, errors.New("State value from http params doesn't match value in cookie. Possible CSRF attack.")
+	}
+
+	// Retrieve session from store. If it doesn't exist, it may have expired.
+	session, err := store.Get(r, oidcStateCookie)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if session.IsNew {
+		return nil, errors.New("session not found, maybe it expired")
+	}
+
+	state := session.Values["state"].(State)
+
+	// Revoke the session so that each state value can only be used once.
+	if err = revokeSession(r.Context(), w, session); err != nil {
+		return nil, errors.Wrap(err, "error revoking state session")
+	}
+	return &state, nil
 }

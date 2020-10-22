@@ -68,7 +68,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			// access to the ResponseWriter and thus can't set a cookie. This
 			// means that the cookie will remain at the user's browser but it
 			// will be replaced after the user logs in again.
-			err = revokeSession(ctx, httptest.NewRecorder(), session,
+			err = revokeOIDCSession(ctx, httptest.NewRecorder(), session,
 				sa.provider, sa.oauth2Config, sa.caBundle)
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
