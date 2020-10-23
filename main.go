@@ -211,6 +211,14 @@ func main() {
 		sessionManager: sessionManager,
 	}
 
+	s.newState = oidc.NewStateFunc(
+		&oidc.Config{
+			SessionDomain: c.SessionDomain,
+			SchemeDefault: c.SchemeDefault,
+			SchemeHeader:  c.SchemeHeader,
+		},
+	)
+
 	// Setup complete, mark server ready
 	isReady.Set()
 

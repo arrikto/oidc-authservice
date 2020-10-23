@@ -34,6 +34,7 @@ type server struct {
 	caBundle               []byte
 	sessionManager         oidc.SessionManager
 	tlsCfg                 svc.TlsConfig
+	newState               oidc.StateFunc
 }
 
 // httpHeaderOpts specifies the location of the user's identity inside HTTP
@@ -155,12 +156,13 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 
 	// Initiate OIDC Flow with Authorization Request.
 	// create state parameter from request and store it in cookie with the session key
-	if err := s.oidcStateStore.CreateState(r, w); err != nil {
+	if err := s.oidcStateStore.CreateState(r, w, s.newState); err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
 
+	// Cookie is persisted in ResponseWriter, make a request to parse it.
 	tempReq := &http.Request{Header: make(http.Header)}
 	tempReq.Header.Set("Cookie", w.Header().Get("Set-Cookie"))
 	c, err := tempReq.Cookie(oidc.OidcStateCookie)
