@@ -23,7 +23,8 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 
 **Config Files**
-Please provide all relevant configuration. This includes:
+Please provide all the relevant configuration that you can publicly share. This
+includes:
 - AuthService configuration.
 - OIDC Provider configuration.
 
@@ -31,7 +32,8 @@ If relevant, upload your configuration files here using GitHub, there is no need
 to upload them to any 3rd party services
 
 **Logs**
-Please provide all relevant logs (e.g., AuthServicelog , OIDC Provider logs, etc.)
+Please provide all relevant logs (e.g., AuthService logs , OIDC Provider logs,
+etc.)
 
 **Environment:**
 - AuthService version: (found in image tag)
