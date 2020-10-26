@@ -2,7 +2,7 @@
 
 When contributing to this repository, please first discuss the change you wish
 to make by opening an issue. Discussing the design before implementing a big
-feature can result in a much better and cleaner implementation. 
+feature can result in a much better and cleaner implementation.
 
 ## Pull Request Checklist
 
