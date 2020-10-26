@@ -35,8 +35,8 @@ Please provide all relevant logs (e.g., AuthServicelog , OIDC Provider logs, etc
 
 **Environment:**
 - AuthService version: (found in image tag)
-- Platform: (GKE, Azure, minikube, custom...) 
-- Kubernetes version: 
+- Platform: (GKE, Azure, minikube, custom...)
+- Kubernetes version:
 
 
 **Additional context**
