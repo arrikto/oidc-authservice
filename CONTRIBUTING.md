@@ -7,7 +7,7 @@ feature can result in a much better and cleaner implementation.
 ## Pull Request Checklist
 
 Please ensure your PR meets the following requirements:
-- Commits MUST be signed-off by the committer. For example:
+- Commits must be signed-off by the committer. For example:
 
    ```
    This is my commit message
@@ -21,5 +21,7 @@ Please ensure your PR meets the following requirements:
    ```console
    $ git commit -s -m 'This is my commit message'
    ```
-- CI tests MUST pass. No PR will be accepted with a broken CI.
-- Documentation MUST be updated, if you added a new user-facing option.
+- CI tests must be passing. The CI tests run when you make a PR, but you can
+  also run them on your fork (since we use GitHub Actions), or [locally on your
+  machine](README.md#E2E-Tests).
+- Documentation must be updated, if you added a new user-facing option.
