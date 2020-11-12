@@ -177,8 +177,10 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// If state is loaded, then it's correct, as it is saved by its id.
 	state, err := verifyState(r, w, s.oidcStateStore)
 	if err != nil {
-		logger.Errorf("Failed to retrieve state from store: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Failed to retrieve state.")
+		logger.Errorf("Failed to verify state parameter: %v", err)
+		returnMessage(w, http.StatusBadRequest, "CSRF check failed."+
+			"This may happen if you opened the login form in more than 1 "+
+			"tabs. Please try to login again.")
 		return
 	}
 

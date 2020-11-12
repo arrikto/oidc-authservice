@@ -61,10 +61,13 @@ func createState(r *http.Request, w http.ResponseWriter,
 
 // verifyState gets the state from the cookie 'initState' saved. It also gets
 // the state from an http param and:
-// 1. Confirms the two values match.
-// 2. Confirms we issued the state value by decoding it.
+// 1. Confirms the two values match (CSRF check).
+// 2. Confirms the value is still valid by retrieving the session it points to.
+//    The state value might be invalid if it has been used before or the session
+//    expired.
 //
-// Finally, it returns the decoded state value.
+// Finally, it returns a State struct, which contains information associated
+// with the particular OIDC flow.
 func verifyState(r *http.Request, w http.ResponseWriter,
 	store sessions.Store) (*State, error) {
 
@@ -82,7 +85,10 @@ func verifyState(r *http.Request, w http.ResponseWriter,
 
 	// Confirm the two values match.
 	if stateParam != stateCookie.Value {
-		return nil, errors.New("State value from http params doesn't match value in cookie. Possible CSRF attack.")
+		return nil, errors.New("State value from http params doesn't match " +
+			"value in cookie. Possible reasons for this error include " +
+			"opening the login form in more than 1 browser tabs OR a CSRF " +
+			"attack.")
 	}
 
 	// Retrieve session from store. If it doesn't exist, it may have expired.
@@ -91,7 +97,7 @@ func verifyState(r *http.Request, w http.ResponseWriter,
 		return nil, errors.WithStack(err)
 	}
 	if session.IsNew {
-		return nil, errors.New("session not found, maybe it expired")
+		return nil, errors.New("State value not found in store, maybe it expired")
 	}
 
 	state := session.Values[sessionValueState].(State)
