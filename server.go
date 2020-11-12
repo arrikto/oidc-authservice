@@ -65,6 +65,10 @@ type httpHeaderOpts struct {
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
+	// Always return 503 with a message
+	returnMessage(w, http.StatusInternalServerError, "Test message")
+	return
+
 	logger := loggerForRequest(r)
 	logger.Info("Authenticating request...")
 

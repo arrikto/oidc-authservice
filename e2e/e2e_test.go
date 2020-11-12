@@ -106,7 +106,7 @@ func (suite *E2ETestSuite) SetupSuite() {
 }
 
 func (suite *E2ETestSuite) TearDownSuite() {
-	suite.Require().Nil(deleteK3DCluster())
+	// suite.Require().Nil(deleteK3DCluster())
 }
 
 func (suite *E2ETestSuite) TestKubernetesLogin() {
