@@ -43,15 +43,24 @@ func sessionFromID(id string, store sessions.Store) (*sessions.Session, error) {
 }
 
 // sessionFromRequest looks for a session id in a header and a cookie, in that
-// order.
+// order. If it doesn't find a valid session in the header, it will then check
+// the cookie.
 func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	header string) (*sessions.Session, error) {
 
-	// Get session from header or cookie
+	logger := loggerForRequest(r)
+	// Try to get session from header
 	sessionID := getBearerToken(r.Header.Get(header))
 	if sessionID != "" {
-		return sessionFromID(sessionID, store)
+		s, err := sessionFromID(sessionID, store)
+		if err == nil && !s.IsNew {
+			logger.Infof("Loading session from header %s", header)
+			return s, nil
+		}
+		logger.Debugf("Header %s didn't contain a valid session id: %v", header, err)
 	}
+	// Header failed, try to get session from cookie
+	logger.Infof("Loading session from cookie %s", cookie)
 	return store.Get(r, cookie)
 }
 
