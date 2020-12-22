@@ -42,6 +42,7 @@ func createState(r *http.Request, w http.ResponseWriter,
 	s := newState(r.URL.Path)
 	session := sessions.NewSession(store, oidcStateCookie)
 	session.Options.MaxAge = int(20 * time.Minute)
+	session.Options.Path = "/"
 	session.Values[sessionValueState] = *s
 
 	err := session.Save(r, w)
