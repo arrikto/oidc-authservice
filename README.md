@@ -40,7 +40,7 @@ Following environment variables are used by the software.
 | Setting | Description |
 | - | - |
 | `OIDC_PROVIDER` |  URL to your OIDC provider. AuthService expects to find information about your OIDC provider at `OIDC_PROVIDER/.well-known/openid-configuration`, and will use this information to contact your OIDC provider and initiate an OIDC flow later on.|
-| `AUTHSERVICE_URL_PREFIX` | AuthService expects end users will be able to access its Web-based UI from the outside world at `AUTHSERVICE_URL_PREFIX`. Usually, it's in the form of `<APP_URL>/authservice/` It expects that your API Gateway will route any URL that starts with `AUTHSERVICE_URL_PREFIX` (@yanniszark) to it, so it can expose its default Web-based UI and API endpoints. AuthService will use this value to auto-generate sane defaults for a number of settings, including `HOMEPAGE_URL`, `LOGOUT_URL`, and `AFTER_LOGOUT_URL`. The default value, `/authservice/` will work out of the box with an Istio `VirtualService` specifying `/authservice/` as its `prefix`. |
+| `AUTHSERVICE_URL_PREFIX` | AuthService expects end users will be able to access its Web-based UI from the outside world at `AUTHSERVICE_URL_PREFIX`. Usually, it's in the form of `<APP_URL>/authservice/` It expects that your API Gateway will route any URL that starts with `AUTHSERVICE_URL_PREFIX` to it, so it can expose its default Web-based UI and API endpoints. AuthService will use this value to auto-generate sane defaults for a number of settings, including `HOMEPAGE_URL`, `LOGOUT_URL`, and `AFTER_LOGOUT_URL`. The default value, `/authservice/` will work out of the box with an Istio `VirtualService` specifying `/authservice/` as its `prefix`. |
 | `CLIENT_ID` | AuthService will use this Client ID when it needs to contact your OIDC provider and initiate an OIDC flow. |
 | `CLIENT_SECRET` | AuthService will use this Client Secret to authenticate itself against your OIDC provider in combination with `CLIENT_ID` when attempting to access your OIDC Provider's protected endpoints |
 
@@ -133,7 +133,7 @@ By default, OIDC AuthService attempts to authenticate client requests with each 
 | Setting | Default | Description |
 | - | - | - |
 | `IDTOKEN_AUTHN_ENABLED` | `true` | Set `IDTOKEN_AUTHN_ENABLED` to `false` to disable the ID token authentication method. |
-| `KUBERNETES_AUTHN_ENABLED` | `true` | Set `Kubernetes_AUTHN_ENABLED` to `false` to disable the Kubernetes authentication method. |
+| `KUBERNETES_AUTHN_ENABLED` | `true` | Set `KUBERNETES_AUTHN_ENABLED` to `false` to disable the Kubernetes authentication method. |
 | `ACCESS_TOKEN_AUTHN_ENABLED` | `true` | Set `ACCESS_TOKEN_AUTHN_ENABLED` to `false` to disable both the access token authentication methods. |
 | `ACCESS_TOKEN_AUTHN` | "jwt" | Set `ACCESS_TOKEN_AUTHN` to either "jwt" to enable the JWT access token authentication method, or "opaque" to enable the opaque access token authentication method. Note the only one of the two access token authentication methods can be used. |
 
