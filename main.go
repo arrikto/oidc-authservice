@@ -20,6 +20,16 @@ import (
 	"github.com/yosssi/boltstore/shared"
 )
 
+func newAuthorizer(c *config) authorizer.Authorizer {
+	if c.AuthzConfigPath != "" {
+		log.Infof("AuthzConfig file path=%s", c.AuthzConfigPath)
+		return authorizer.NewConfigAuthorizer(c.AuthzConfigPath)
+	} else {
+		log.Info("no AuthzConfig file specified, using basic groups authorizer")
+		return authorizer.NewGroupsAuthorizer(c.GroupsAllowlist)
+	}
+}
+
 func main() {
 
 	c, err := parseConfig()
@@ -148,8 +158,6 @@ func main() {
 		authenticators = append(authenticators, sessionAuthenticator)
 	}
 
-	groupsAuthorizer := authorizer.NewGroupsAuthorizer(c.GroupsAllowlist)
-
 	if enabledAuthenticators["idtoken"] {
 		idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
 			c.IDTokenHeader,
@@ -178,7 +186,7 @@ func main() {
 		},
 		userIdTransformer: c.UserIDTransformer,
 		authenticators:    authenticators,
-		authorizers:       []authorizer.Authorizer{groupsAuthorizer},
+		authorizers:       []authorizer.Authorizer{newAuthorizer(c)},
 		tlsCfg:            tlsCfg,
 		sessionManager:    sessionManager,
 	}
