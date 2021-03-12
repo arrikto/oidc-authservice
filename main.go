@@ -23,7 +23,12 @@ import (
 func newAuthorizer(c *config) authorizer.Authorizer {
 	if c.AuthzConfigPath != "" {
 		log.Infof("AuthzConfig file path=%s", c.AuthzConfigPath)
-		return authorizer.NewConfigAuthorizer(c.AuthzConfigPath)
+		authz, err := authorizer.NewConfigAuthorizer(c.AuthzConfigPath)
+		if err != nil {
+			log.Fatalf("Error creating configAuthorizer: %v", err)
+		}
+
+		return authz
 	} else {
 		log.Info("no AuthzConfig file specified, using basic groups authorizer")
 		return authorizer.NewGroupsAuthorizer(c.GroupsAllowlist)

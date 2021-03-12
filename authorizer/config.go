@@ -9,6 +9,7 @@ import (
 
 	"github.com/arrikto/oidc-authservice/authenticator"
 	log "github.com/sirupsen/logrus"
+	fsnotify "gopkg.in/fsnotify/fsnotify.v1"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -36,32 +37,84 @@ type configAuthorizer struct {
 	config       *AuthzConfig
 	configPath   string
 	groupMatcher map[string]map[string]struct{}
+	watcher      *fsnotify.Watcher
 }
 
-func NewConfigAuthorizer(configPath string) Authorizer {
+func NewConfigAuthorizer(configPath string) (Authorizer, error) {
 	ca := configAuthorizer{}
 	ca.configPath = configPath
-	authzConfig, err := ca.parseConfig(configPath)
-	if err != nil {
-		panic(fmt.Sprintf("error loading config: %v", err))
+	if err := ca.loadConfig(); err != nil {
+		return nil, err
 	}
-	ca.config = authzConfig
 
-	// populate groupMatcher
-	ca.groupMatcher = make(map[string]map[string]struct{})
-	for host, rule := range ca.config.Rules {
-		ca.groupMatcher[host] = make(map[string]struct{})
+	var err error
+	ca.watcher, err = fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("error creating file watcher: %v", err)
+	}
+
+	defer ca.watcher.Close()
+	go func() {
+		for {
+			select {
+			case ev, ok := <-ca.watcher.Events:
+				if !ok {
+					return
+				}
+
+				log.Debugf("file watcher event: name=%s op=%s", ev.Name, ev.Op)
+				// do nothing on Chmod
+				if ev.Op == fsnotify.Chmod {
+					continue
+				}
+
+				if ev.Op&fsnotify.Remove == fsnotify.Remove {
+					// read watcher on remove because fsnotify stops watching
+					if err := ca.watcher.Add(ev.Name); err != nil {
+						log.Errorf(
+							"failed to read watcher for file %q", configPath)
+					}
+				}
+
+				log.Infof("try to reload config file...")
+				if err := ca.loadConfig(); err != nil {
+					log.Errorf("failed to reload config: %v", err)
+				}
+			case err, ok := <-ca.watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Infof("watcher error: %v", err)
+			}
+		}
+	}()
+
+	err = ca.watcher.Add(configPath)
+	if err != nil {
+		log.Fatalf("Error updating file watcher: %v", err)
+	}
+
+	return &ca, nil
+}
+
+func (ca *configAuthorizer) loadConfig() error {
+	authzConfig, err := ca.parseConfig(ca.configPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	// build groupMatcher map
+	groupMatcher := make(map[string]map[string]struct{})
+	for host, rule := range authzConfig.Rules {
+		groupMatcher[host] = make(map[string]struct{})
 		for _, g := range rule.Groups {
-			ca.groupMatcher[host][g] = struct{}{}
+			groupMatcher[host][g] = struct{}{}
 		}
 	}
-
-	log.Infof("AuthzConfig: %+v", *authzConfig)
-
-	// TODO inotify stuff, maybe just spawn a goroutine here.
-	// wanna make sure to stop it gracefully
-	// watcher, err := fsnotify.NewWatcher()
-	return &ca
+	log.Infof("loaded AuthzConfig: %+v", *authzConfig)
+	ca.groupMatcher = groupMatcher
+	ca.config = authzConfig
+	return nil
 }
 
 func (ca *configAuthorizer) parse(raw []byte) (*AuthzConfig, error) {
