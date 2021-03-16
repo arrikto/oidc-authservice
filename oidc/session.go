@@ -133,6 +133,8 @@ func (s *SessionStore) NewSession(
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
 	session.Options.Domain = s.sessionDomain
+	session.Options.HttpOnly = true
+	session.Options.Secure = true
 
 	userID, err := claims.UserID()
 	if err != nil {
