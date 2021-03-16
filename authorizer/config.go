@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/arrikto/oidc-authservice/authenticator"
 	log "github.com/sirupsen/logrus"
@@ -38,6 +39,7 @@ type configAuthorizer struct {
 	configPath   string
 	groupMatcher map[string]map[string]struct{}
 	watcher      *fsnotify.Watcher
+	lock         sync.RWMutex
 }
 
 func NewConfigAuthorizer(configPath string) (Authorizer, error) {
@@ -112,6 +114,8 @@ func (ca *configAuthorizer) loadConfig() error {
 		}
 	}
 	log.Infof("loaded AuthzConfig: %+v", *authzConfig)
+	ca.lock.Lock()
+	defer ca.lock.Unlock()
 	ca.groupMatcher = groupMatcher
 	ca.config = authzConfig
 	return nil
@@ -146,7 +150,9 @@ func (ca *configAuthorizer) parseConfig(path string) (*AuthzConfig, error) {
 func (ca *configAuthorizer) Authorize(r *http.Request, user *authenticator.User) (bool, string, error) {
 	host := r.Host
 
+	ca.lock.RLock()
 	allowedGroups, ok := ca.groupMatcher[host]
+	ca.lock.RUnlock()
 	// no groups specified for the host, allow the request
 	if !ok {
 		// TODO make this default behavior configurable
