@@ -9,9 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 
-	"github.com/arrikto/oidc-authservice/authenticator"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -80,18 +78,4 @@ func resolvePathReference(u *url.URL, p string) *url.URL {
 	ret := *u
 	ret.Path = path.Join(ret.Path, p)
 	return &ret
-}
-
-func userInfoToHeaders(user *authenticator.User, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
-	res := map[string]string{}
-	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(user.Name)
-	res[opts.groupsHeader] = strings.Join(user.Groups, ",")
-
-	if opts.userIDHeader != "" {
-		res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(user.Name)
-	}
-	if opts.groupsHeader != "" {
-		res[opts.groupsHeader] = strings.Join(user.Groups, ",")
-	}
-	return res
 }
