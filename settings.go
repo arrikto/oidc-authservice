@@ -38,6 +38,7 @@ type config struct {
 	UserIDPrefix      string            `split_words:"true" envconfig:"USERID_PREFIX"`
 	UserIDTransformer UserIDTransformer `envconfig:"USERID_TRANSFORMERS"`
 	TokenHeader       string            `split_words:"true" default:"Authorization"`
+	TokenScheme       string            `split_words:"true" default:"Bearer"`
 
 	// IDToken
 	UserIDClaim       string `split_words:"true" default:"email" envconfig:"USERID_CLAIM"`

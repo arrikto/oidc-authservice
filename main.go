@@ -164,6 +164,7 @@ func main() {
 		sessionAuthenticator := authenticator.NewSessionAuthenticator(
 			sessionStore,
 			c.TokenHeader,
+			c.TokenScheme,
 			c.StrictSessionValidation,
 			tlsCfg,
 			sessionManager,
