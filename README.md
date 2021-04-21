@@ -115,11 +115,11 @@ Applications can then use those headers to identify the user.
 | - | - | - |
 | `USERID_CLAIM` | "email" |Claim whose value will be used as the userid (default `email`). |
 | `GROUPS_CLAIM` | "groups" | Claim whose value will be used as the user's groups (default `groups`) |
-| `USERID_HEADER` | "kubeflow-userid" | Name of the header containing the user-id that will be added to the upstream request. |
+| `USERID_HEADER` | "" | Name of the header containing the user-id to be added to the upstream request. Header omitted if unset |
 | `USERID_PREFIX` | "" | Prefix to add to the userid, which will be the value of the `USERID_HEADER`. |
 | `USERID_TRANSFORMERS` | "" | List of transformations for the userid value (from `USERID_CLAIM`) in JSON format `[{"matches": "regex", "replaces": "value"}, ...]`. OIDC AuthService will evaluate the transformation rules in order and if the `matches` pattern matches the userid, the match is replaced by the `replaces` value.  **If multiple rules match, only the first one is applied** and if no rule matches the userid, the original userid will be used. For the `matches` regular expression, use the standard `golang` syntax [(more info)](https://golang.org/pkg/regexp/). Note that a regular expression is a string and the `\` **must be escaped** (using `\\`). For example using `USERID_TRANSFORMERS = '[{"matches": "user@domain\\.com$", "replaces": "internal"}, {"matches": "@domain\\.com$", "replaces": ""}]'`, AuthService will do the following transformation:  `user@domain.com` -> `internal` and `another@domain.com` -> `another`. |
-| `GROUPS_HEADER` | "kubeflow-groups" | Name of the header containing the groups that will be added to the upstream request.
-| `TOKEN_HEADER` | "Authorization" | Name of the header containing user id token (JWT) that will be added to the upstream request.
+| `GROUPS_HEADER` | "" | Name of the header containing the groups to be added to the upstream request. Header omitted if unset |
+| `TOKEN_HEADER` | "Authorization" | Name of the header containing user id token (JWT) that will be added to the upstream request. |
 | `TOKEN_SCHEME` | "Bearer" | Authorization scheme (e.g. Bearer, Basic) used for user id token. |
 
 OIDC AuthService can also perform basic authorization checks. The following
