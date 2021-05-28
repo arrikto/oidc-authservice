@@ -31,9 +31,10 @@ type config struct {
 	AfterLogoutURL       *url.URL `split_words:"true"`
 
 	// Identity Headers
-	UserIDHeader string `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
-	GroupsHeader string `split_words:"true" default:"kubeflow-groups"`
-	UserIDPrefix string `split_words:"true" envconfig:"USERID_PREFIX"`
+	UserIDHeader       string            `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
+	GroupsHeader       string            `split_words:"true" default:"kubeflow-groups"`
+	UserIDPrefix       string            `split_words:"true" envconfig:"USERID_PREFIX"`
+	UserIDTransformer UserIDTransformer `envconfig:"USERID_TRANSFORMERS"`
 
 	// IDToken
 	UserIDClaim       string `split_words:"true" default:"email" envconfig:"USERID_CLAIM"`

@@ -118,6 +118,7 @@ Applications can then use those headers to identify the user.
 | `GROUPS_CLAIM` | "groups" | Claim whose value will be used as the user's groups (default `groups`) |
 | `USERID_HEADER` | "kubeflow-userid" | Name of the header containing the user-id that will be added to the upstream request. |
 | `USERID_PREFIX` | "" | Prefix to add to the userid, which will be the value of the `USERID_HEADER`. |
+| `USERID_TRANSFORMERS` | "" | List of transformations for the userid value (from `USERID_CLAIM`) in JSON format `[{"matches": "regex", "replaces": "value"}, ...]`. `oidc-authservice` will evaluate the transformation rules in order and if the `matches` pattern matches the userid, the match is replaced by the `replaces` value.  **If multiple rules match, only the first one is applied** and if no rule matches the userid, the original userid will be used. For the `matches` regular expression, use the standard `golang` syntax [(more info)](https://golang.org/pkg/regexp/). Note that the regular expressions is a string and the `\` **must be escaped** (using `\\`)<br> For example using ```USERID_TRANSFORMERS = '[{"matches": "user@domain\\.com$", "internal"}, {"matches": "@domain\\.com$", ""}]'```  `autheservice` will do the following transformation:  `user@domain.com` -> `internal` and `another@domain.com` -> `another`.
 | `GROUPS_HEADER` | "kubeflow-groups" | Name of the header containing the groups that will be added to the upstream request.
 
 OIDC AuthService can also perform basic authorization checks. The following

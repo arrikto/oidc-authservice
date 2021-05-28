@@ -44,6 +44,7 @@ type server struct {
 	authHeader              string
 	idTokenOpts             jwtClaimOpts
 	upstreamHTTPHeaderOpts  httpHeaderOpts
+	userIdTransformer       UserIDTransformer
 	caBundle                []byte
 	sessionSameSite         http.SameSite
 }
@@ -129,7 +130,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts) {
+	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
 		w.Header().Set(k, v)
 	}
 	w.WriteHeader(http.StatusOK)
