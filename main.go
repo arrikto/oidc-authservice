@@ -182,6 +182,7 @@ func main() {
 			userIDPrefix: c.UserIDPrefix,
 			groupsHeader: c.GroupsHeader,
 		},
+		userIdTransformer:       c.UserIDTransformer,
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
 		strictSessionValidation: c.StrictSessionValidation,
 		authHeader:              c.AuthHeader,

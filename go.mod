@@ -6,6 +6,7 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/coreos/go-oidc v2.1.0+incompatible
+	github.com/emirpasic/gods v1.12.0
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/sessions v1.2.0
