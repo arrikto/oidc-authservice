@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"regexp"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -86,11 +86,15 @@ func (uit *UserIDTransformer) Decode(value string) error {
 				rules = append(rules, &rule)
 			} else {
 				// If the required fields are missing, return an error.
-				return errors.New("error unmarshalling UserID transformer JSON config")
+				return errors.Errorf("error unmarshalling UserID transformer"+
+					" JSON config, 'replaces' field is missing. Entry: %v",
+					entry)
 			}
 		} else {
 			// If no unmarshalling subtype is matched, return an error
-			return errors.New("error unmarshalling UserID transformer JSON config")
+			return errors.Errorf("error unmarshalling UserID transformer"+
+				" JSON config, 'matches' field is missing. Entry: %v",
+				entry)
 		}
 	}
 	*uit = UserIDTransformer{
