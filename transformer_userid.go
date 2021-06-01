@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"regexp"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // userIDTransformationRule represents a single transformation rule and
