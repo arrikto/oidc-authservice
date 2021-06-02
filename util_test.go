@@ -34,7 +34,7 @@ func TestCreateNonce_Simple(t *testing.T) {
 // See: https://en.wikipedia.org/wiki/Pearson%27s_chi-squared_test
 func TestCreateNonce_Distribution(t *testing.T) {
 
-	nonce, err := createNonce(10000000)
+	nonce, err := createNonce(100000000)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

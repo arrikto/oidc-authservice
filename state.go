@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/gob"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -39,13 +40,20 @@ func newState(firstVisitedURL string) *State {
 func createState(r *http.Request, w http.ResponseWriter,
 	store sessions.Store) (string, error) {
 
-	s := newState(r.URL.Path)
+	firstVisitedURL, err := url.Parse("")
+	if err != nil {
+		return "", errors.Wrap(err, "Failed to initialize empty URL")
+	}
+	firstVisitedURL.Path = r.URL.Path
+	firstVisitedURL.RawPath = r.URL.RawPath
+	firstVisitedURL.RawQuery = r.URL.RawQuery
+	s := newState(firstVisitedURL.String())
 	session := sessions.NewSession(store, oidcStateCookie)
 	session.Options.MaxAge = int(20 * time.Minute)
 	session.Options.Path = "/"
 	session.Values[sessionValueState] = *s
 
-	err := session.Save(r, w)
+	err = session.Save(r, w)
 	if err != nil {
 		return "", errors.Wrap(err, "error trying to save session")
 	}
