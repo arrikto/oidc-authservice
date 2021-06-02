@@ -263,7 +263,11 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	var destination = state.FirstVisitedURL
 	if s.afterLoginRedirectURL != "" {
 		// Redirect to a predefined url from config, add the original url as `next` query parameter.
-		destination = s.afterLoginRedirectURL + "?next=" + state.FirstVisitedURL
+		afterLoginRedirectURL := mustParseURL(s.afterLoginRedirectURL)
+		q := afterLoginRedirectURL.Query()
+		q.Set("next", state.FirstVisitedURL)
+		afterLoginRedirectURL.RawQuery = q.Encode()
+		destination = afterLoginRedirectURL.String()
 	}
 
 	http.Redirect(w, r, destination, http.StatusFound)
