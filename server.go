@@ -262,7 +262,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// Getting the firstVisitedURL from the OIDC state
 	var destination = state.FirstVisitedURL
 	if s.afterLoginRedirectURL != "" {
-		destination = s.afterLoginRedirectURL
+		// Redirect to a predefined url from config, add the original url as `next` query parameter.
+		destination = s.afterLoginRedirectURL + "?next=" + state.FirstVisitedURL
 	}
 
 	http.Redirect(w, r, destination, http.StatusFound)
