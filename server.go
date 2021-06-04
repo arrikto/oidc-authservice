@@ -257,19 +257,19 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info("Login validated with ID token, redirecting.")
-
 	// Getting the firstVisitedURL from the OIDC state
 	var destination = state.FirstVisitedURL
 	if s.afterLoginRedirectURL != "" {
-		// Redirect to a predefined url from config, add the original url as `next` query parameter.
+		// Redirect to a predefined url from config, add the original url as
+		// `next` query parameter.
 		afterLoginRedirectURL := mustParseURL(s.afterLoginRedirectURL)
 		q := afterLoginRedirectURL.Query()
 		q.Set("next", state.FirstVisitedURL)
 		afterLoginRedirectURL.RawQuery = q.Encode()
 		destination = afterLoginRedirectURL.String()
 	}
-
+	logger.WithField("redirectTo", destination).
+		Info("Login validated with ID token, redirecting.")
 	http.Redirect(w, r, destination, http.StatusFound)
 }
 
