@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -83,7 +83,7 @@ func (s *WebServer) Start(addr string) error {
 			),
 		)
 
-	return http.ListenAndServe(addr, handlers.CORS()(router))
+	return http.ListenAndServe(addr, router)
 }
 
 // siteHandler returns an http.HandlerFunc that serves a given template
