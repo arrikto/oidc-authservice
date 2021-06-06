@@ -185,6 +185,7 @@ func main() {
 		userIdTransformer:       c.UserIDTransformer,
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
 		strictSessionValidation: c.StrictSessionValidation,
+		sessionDomain:           c.SessionDomain,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{

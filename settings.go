@@ -51,6 +51,7 @@ type config struct {
 	SessionStorePath   string `split_words:"true" default:"/var/lib/authservice/data.db"`
 	SessionMaxAge      int    `split_words:"true" default:"86400"`
 	SessionSameSite    string `split_words:"true" default:"Lax"`
+	SessionDomain      string `split_words:"true"`
 
 	// Site
 	ClientName          string            `split_words:"true" default:"AuthService"`
