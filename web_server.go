@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/logger"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -85,7 +84,7 @@ func (s *WebServer) Start(addr string) error {
 			),
 		)
 
-	return http.ListenAndServe(addr, handlers.CORS()(router))
+	return http.ListenAndServe(addr, router)
 }
 
 // siteHandler returns an http.HandlerFunc that serves a given template

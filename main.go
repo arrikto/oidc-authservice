@@ -13,7 +13,6 @@ import (
 	"github.com/arrikto/oidc-authservice/authorizer"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
@@ -74,7 +73,7 @@ func main() {
 	log.Infof("Starting server at %v:%v", c.Hostname, c.Port)
 	stopCh := make(chan struct{})
 	go func(stopCh chan struct{}) {
-		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), handlers.CORS()(router)))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), router))
 		close(stopCh)
 	}(stopCh)
 
