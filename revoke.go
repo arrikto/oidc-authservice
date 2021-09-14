@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -33,15 +34,36 @@ func revocationEndpoint(p *oidc.Provider) (string, error) {
 // If no tokens are found, it succeeds.
 func revokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.Token, clientID, clientSecret string) error {
 	if token.RefreshToken != "" {
+		log.Info("Attempting to revoke refresh token...")
 		err := revokeToken(ctx, revocationEndpoint, token.RefreshToken, "refresh_token", clientID, clientSecret)
 		if err != nil {
 			return errors.Wrap(err, "Failed to revoke refresh token")
 		}
+		log.Info("Successfully revoked refresh token")
 	}
 	if token.AccessToken != "" {
+		log.Info("Attempting to revoke access token...")
 		err := revokeToken(ctx, revocationEndpoint, token.AccessToken, "access_token", clientID, clientSecret)
 		if err != nil {
-			log.Warning("Failed to revoke access token")
+			code := err.(*requestError).Response.StatusCode
+			if code == 400 {
+				bodyMap := make(map[string]string)
+
+				err2 := json.Unmarshal(err.(*requestError).Body, &bodyMap)
+				if err2 != nil {
+					err2 = errors.Wrap(err2, "Error while attempting to unmarshal the body of the request")
+					full_error := errors.New(err.Error() + err2.Error())
+					return errors.Wrap(full_error, "Error while attempting to revoke access token")
+				}
+
+				if bodyMap["error"] == "unsupported_token_type" {
+					log.Warning("The Identity Provider does not support revoking access tokens")
+					return nil
+				}
+			}
+			return errors.Wrap(err, "Failed to revoke access token")
+		} else {
+			log.Info("Successfully revoked access token")
 		}
 	}
 	return nil
