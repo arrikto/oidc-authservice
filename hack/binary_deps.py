@@ -11,10 +11,10 @@ import urllib.request
 
 log = logging.getLogger(__name__)
 
-KUSTOMIZE_URL = "https://github.com/kubernetes-sigs/kustomize/releases/download/v3.2.0/kustomize_3.2.0_linux_amd64"
+KUSTOMIZE_URL = "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v4.4.0/kustomize_v4.4.0_linux_amd64.tar.gz"
 GO_URL = "https://dl.google.com/go/go1.14.1.linux-amd64.tar.gz"
-KUBECTL_URL = "https://storage.googleapis.com/kubernetes-release/release/v1.18.2/bin/linux/amd64/kubectl"
-K3D_URL = "https://github.com/rancher/k3d/releases/download/v3.0.1/k3d-linux-amd64"
+KUBECTL_URL = "https://storage.googleapis.com/kubernetes-release/release/v1.19.15/bin/linux/amd64/kubectl"
+K3D_URL = "https://github.com/rancher/k3d/releases/download/v4.4.8/k3d-linux-amd64"
 
 
 def parse_args():
@@ -58,7 +58,7 @@ def main():
     download_from_tar(GO_URL, args.output_dir, flatten=False)
 
     log.info("Installing kustomize...")
-    download_to(KUSTOMIZE_URL, os.path.join(args.output_dir, "kustomize"))
+    download_from_tar(KUSTOMIZE_URL, args.output_dir)
     os.chmod(os.path.join(args.output_dir, "kustomize"), stat.S_IRWXU)
 
     log.info("Installing kubectl...")
