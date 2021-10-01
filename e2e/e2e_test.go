@@ -428,9 +428,9 @@ func waitForDeployment(
 func createK3DCluster() error {
 	// FIXME: Prefer creating a cluster with a random name. Else, try to remove
 	// the cluster before creating it.
-	cmd := exec.Command("k3d", "cluster", "create", "e2e-test-cluster", "--k3s-server-arg",
+	cmd := exec.Command("k3d", "cluster", "create", "e2e-test-cluster", "--image", "rancher/k3s:v1.19.15-k3s1", "--k3s-server-arg",
 		"--no-deploy=traefik", "--no-lb", "--wait", "--timeout", "5m",
-		"--update-default-kubeconfig=false")
+		"--kubeconfig-update-default=false")
 	cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
 	err := cmd.Run()
 	if err != nil {
