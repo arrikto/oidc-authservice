@@ -1,4 +1,4 @@
-package main
+package authenticator
 
 import (
 	"net/http"
@@ -22,6 +22,20 @@ type sessionAuthenticator struct {
 	tlsCfg svc.TlsConfig
 	// sm is responsible for managing OIDC sessions
 	sm oidc.SessionManager
+}
+
+func NewSessionAuthenticator(
+	store oidc.SessionStore,
+	strictSessionValidation bool,
+	tlsCfg svc.TlsConfig,
+	sessionManager oidc.SessionManager) Authenticator {
+
+	return &sessionAuthenticator{
+		store:                   store,
+		strictSessionValidation: strictSessionValidation,
+		tlsCfg:                  tlsCfg,
+		sm:                      sessionManager,
+	}
 }
 
 func (sa *sessionAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {

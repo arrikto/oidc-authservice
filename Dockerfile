@@ -12,6 +12,7 @@ COPY go.sum .
 RUN go mod download
 # Copy in the code and compile
 COPY *.go ./
+COPY authenticator ./authenticator
 COPY logger ./logger
 COPY svc ./svc
 COPY oidc ./oidc

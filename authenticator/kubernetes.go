@@ -1,4 +1,4 @@
-package main
+package authenticator
 
 import (
 	"net/http"
@@ -20,7 +20,7 @@ type kubernetesAuthenticator struct {
 	authenticator kauthenticator.Request
 }
 
-func newKubernetesAuthenticator(c *rest.Config, aud []string) (Authenticator, error) {
+func NewKubernetesAuthenticator(c *rest.Config, aud []string) (Authenticator, error) {
 	config := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:               false,
 		TokenAccessReviewClient: kubernetes.NewForConfigOrDie(c).AuthenticationV1().TokenReviews(),
@@ -34,7 +34,6 @@ func (k8sauth *kubernetesAuthenticator) Authenticate(w http.ResponseWriter, r *h
 	resp, found, err := k8sauth.authenticator.AuthenticateRequest(
 		r.WithContext(kauthenticator.WithAudiences(r.Context(), k8sauth.audiences)),
 	)
-
 	// If the request contains an expired token, we stop trying and return 403
 	if err != nil && strings.Contains(err.Error(), bearerTokenExpiredMsg) {
 		return nil, &svc.LoginExpiredError{Err: err}

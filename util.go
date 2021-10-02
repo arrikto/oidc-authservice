@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/authenticator"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -81,7 +82,7 @@ func resolvePathReference(u *url.URL, p string) *url.URL {
 	return &ret
 }
 
-func userInfoToHeaders(user *User, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
+func userInfoToHeaders(user *authenticator.User, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
 	res := map[string]string{}
 	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(user.Name)
 	res[opts.groupsHeader] = strings.Join(user.Groups, ",")

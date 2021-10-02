@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/arrikto/oidc-authservice/authenticator"
 )
 
 const (
@@ -14,7 +16,7 @@ const (
 // The interface draws some inspiration from Kubernetes' interface:
 // https://github.com/kubernetes/apiserver/blob/master/pkg/authorization/authorizer/interfaces.go#L67-L72
 type Authorizer interface {
-	Authorize(r *http.Request, user *User) (allowed bool, reason string, err error)
+	Authorize(r *http.Request, user *authenticator.User) (allowed bool, reason string, err error)
 }
 
 type groupsAuthorizer struct {
@@ -35,7 +37,7 @@ func newGroupsAuthorizer(allowlist []string) Authorizer {
 	}
 }
 
-func (ga *groupsAuthorizer) Authorize(r *http.Request, user *User) (bool, string, error) {
+func (ga *groupsAuthorizer) Authorize(r *http.Request, user *authenticator.User) (bool, string, error) {
 	if ga.allowed[wildcardMatcher] {
 		return true, "", nil
 	}

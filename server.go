@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/authenticator"
 	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
@@ -22,7 +23,7 @@ var (
 type server struct {
 	sessionStore           oidc.SessionStore
 	oidcStateStore         oidc.OidcStateStore
-	authenticators         []Authenticator
+	authenticators         []authenticator.Authenticator
 	authorizers            []Authorizer
 	afterLoginRedirectURL  string
 	homepageURL            string
@@ -47,7 +48,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	logger := logger.ForRequest(r)
 	logger.Info("Authenticating request...")
 
-	var user *User
+	var user *authenticator.User
 	for i, auth := range s.authenticators {
 		resp, err := auth.Authenticate(w, r)
 

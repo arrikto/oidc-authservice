@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/arrikto/oidc-authservice/authenticator"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/gorilla/handlers"
@@ -104,7 +105,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error getting K8s config: %v", err)
 	}
-	k8sAuthenticator, err := newKubernetesAuthenticator(restConfig, c.Audiences)
+	k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(restConfig, c.Audiences)
 	if err != nil {
 		log.Fatalf("Error creating K8s authenticator: %v", err)
 	}
@@ -131,22 +132,22 @@ func main() {
 		c.SessionSameSite,
 	)
 
-	sessionAuthenticator := &sessionAuthenticator{
-		store:                   sessionStore,
-		strictSessionValidation: c.StrictSessionValidation,
-		tlsCfg:                  tlsCfg,
-		sm:                      sessionManager,
-	}
+	sessionAuthenticator := authenticator.NewSessionAuthenticator(
+		sessionStore,
+		c.StrictSessionValidation,
+		tlsCfg,
+		sessionManager,
+	)
 
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
-	idTokenAuthenticator := &idTokenAuthenticator{
-		header:         c.IDTokenHeader,
-		userIDClaim:    c.UserIDClaim,
-		groupsClaim:    c.GroupsClaim,
-		sessionManager: sessionManager,
-		tlsCfg:         tlsCfg,
-	}
+	idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
+		c.IDTokenHeader,
+		c.UserIDClaim,
+		c.GroupsClaim,
+		sessionManager,
+		tlsCfg,
+	)
 
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
@@ -164,7 +165,7 @@ func main() {
 			groupsHeader: c.GroupsHeader,
 		},
 		userIdTransformer: c.UserIDTransformer,
-		authenticators: []Authenticator{
+		authenticators: []authenticator.Authenticator{
 			sessionAuthenticator,
 			idTokenAuthenticator,
 			k8sAuthenticator,

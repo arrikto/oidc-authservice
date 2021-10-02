@@ -1,4 +1,4 @@
-package main
+package authenticator
 
 import (
 	"net/http"
@@ -14,6 +14,19 @@ type idTokenAuthenticator struct {
 	groupsClaim    string
 	sessionManager oidc.SessionManager
 	tlsCfg         svc.TlsConfig
+}
+
+func NewIdTokenAuthenticator(
+	header, userIDClaim, groupsClaim string,
+	sm oidc.SessionManager,
+	tlsCfg svc.TlsConfig) Authenticator {
+	return &idTokenAuthenticator{
+		header:         header,
+		userIDClaim:    userIDClaim,
+		groupsClaim:    groupsClaim,
+		sessionManager: sm,
+		tlsCfg:         tlsCfg,
+	}
 }
 
 func (s *idTokenAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {

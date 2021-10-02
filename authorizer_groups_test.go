@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/arrikto/oidc-authservice/authenticator"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +43,7 @@ func TestGroupsAuthorizer(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			authz := newGroupsAuthorizer(test.allowlist)
-			user := &User{
+			user := &authenticator.User{
 				Groups: test.userGroups,
 			}
 			allowed, reason, err := authz.Authorize(nil, user)
