@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/svc"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
+	kauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -17,10 +17,10 @@ const (
 
 type kubernetesAuthenticator struct {
 	audiences     []string
-	authenticator authenticator.Request
+	authenticator kauthenticator.Request
 }
 
-func newKubernetesAuthenticator(c *rest.Config, aud []string) (authenticator.Request, error) {
+func newKubernetesAuthenticator(c *rest.Config, aud []string) (Authenticator, error) {
 	config := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:               false,
 		TokenAccessReviewClient: kubernetes.NewForConfigOrDie(c).AuthenticationV1().TokenReviews(),
@@ -30,14 +30,19 @@ func newKubernetesAuthenticator(c *rest.Config, aud []string) (authenticator.Req
 	return &kubernetesAuthenticator{audiences: aud, authenticator: k8sAuthenticator}, err
 }
 
-func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+func (k8sauth *kubernetesAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {
 	resp, found, err := k8sauth.authenticator.AuthenticateRequest(
-		r.WithContext(authenticator.WithAudiences(r.Context(), k8sauth.audiences)),
+		r.WithContext(kauthenticator.WithAudiences(r.Context(), k8sauth.audiences)),
 	)
 
 	// If the request contains an expired token, we stop trying and return 403
 	if err != nil && strings.Contains(err.Error(), bearerTokenExpiredMsg) {
-		return nil, false, &svc.LoginExpiredError{Err: err}
+		return nil, &svc.LoginExpiredError{Err: err}
 	}
-	return resp, found, err
+
+	if !found {
+		return nil, nil
+	}
+
+	return &User{Name: resp.User.GetName(), Groups: resp.User.GetGroups()}, err
 }

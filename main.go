@@ -16,7 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/shared"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -165,7 +164,7 @@ func main() {
 			groupsHeader: c.GroupsHeader,
 		},
 		userIdTransformer: c.UserIDTransformer,
-		authenticators: []authenticator.Request{
+		authenticators: []Authenticator{
 			sessionAuthenticator,
 			idTokenAuthenticator,
 			k8sAuthenticator,

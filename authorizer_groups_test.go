@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func TestGroupsAuthorizer(t *testing.T) {
@@ -43,10 +42,10 @@ func TestGroupsAuthorizer(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			authz := newGroupsAuthorizer(test.allowlist)
-			userInfo := &user.DefaultInfo{
+			user := &User{
 				Groups: test.userGroups,
 			}
-			allowed, reason, err := authz.Authorize(nil, userInfo)
+			allowed, reason, err := authz.Authorize(nil, user)
 			require.NoError(t, err, "Unexpected error")
 			require.Equalf(t, test.allowed, allowed, "Reason: %s", reason)
 		})

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 const (
@@ -16,7 +14,7 @@ const (
 // The interface draws some inspiration from Kubernetes' interface:
 // https://github.com/kubernetes/apiserver/blob/master/pkg/authorization/authorizer/interfaces.go#L67-L72
 type Authorizer interface {
-	Authorize(r *http.Request, userinfo user.Info) (allowed bool, reason string, err error)
+	Authorize(r *http.Request, user *User) (allowed bool, reason string, err error)
 }
 
 type groupsAuthorizer struct {
@@ -37,16 +35,16 @@ func newGroupsAuthorizer(allowlist []string) Authorizer {
 	}
 }
 
-func (ga *groupsAuthorizer) Authorize(r *http.Request, userinfo user.Info) (bool, string, error) {
+func (ga *groupsAuthorizer) Authorize(r *http.Request, user *User) (bool, string, error) {
 	if ga.allowed[wildcardMatcher] {
 		return true, "", nil
 	}
-	for _, g := range userinfo.GetGroups() {
+	for _, g := range user.Groups {
 		if ga.allowed[g] {
 			return true, "", nil
 		}
 	}
 	reason := fmt.Sprintf("User's groups ([%s]) are not in allowlist.",
-		strings.Join(userinfo.GetGroups(), ","))
+		strings.Join(user.Groups, ","))
 	return false, reason, nil
 }
