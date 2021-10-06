@@ -27,7 +27,7 @@ type server struct {
 	provider               oidc.IdProvider
 	oauth2Config           *oauth2.Config
 	store                  sessions.Store
-	oidcStateStore         sessions.Store
+	oidcStateStore         oidc.OidcStateStore
 	authenticators         []authenticator.Request
 	authorizers            []Authorizer
 	afterLoginRedirectURL  string
@@ -135,14 +135,24 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 	logger := logger.ForRequest(r)
 
 	// Initiate OIDC Flow with Authorization Request.
-	state, err := createState(r, w, s.oidcStateStore)
+	// create state parameter from request and store it in cookie with the session key
+	if err := s.oidcStateStore.CreateState(r, w); err != nil {
+		logger.Errorf("Failed to save state in store: %v", err)
+		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
+		return
+	}
+
+	tempReq := &http.Request{Header: make(http.Header)}
+	tempReq.Header.Set("Cookie", w.Header().Get("Set-Cookie"))
+	c, err := tempReq.Cookie(oidc.OidcStateCookie)
+
 	if err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
 
-	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(state), http.StatusFound)
+	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(c.Value), http.StatusFound)
 }
 
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
@@ -169,7 +179,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If state is loaded, then it's correct, as it is saved by its id.
-	state, err := verifyState(r, w, s.oidcStateStore)
+	state, err := s.oidcStateStore.Verify(r, w)
 	if err != nil {
 		logger.Errorf("Failed to verify state parameter: %v", err)
 		returnMessage(w, http.StatusBadRequest, "CSRF check failed."+

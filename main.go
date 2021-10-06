@@ -159,7 +159,7 @@ func main() {
 		oauth2Config: oauth2Config,
 		// TODO: Add support for Redis
 		store:                  store,
-		oidcStateStore:         oidcStateStore,
+		oidcStateStore:         oidc.NewOidcStateStore(oidcStateStore),
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
