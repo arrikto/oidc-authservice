@@ -18,7 +18,7 @@ import (
 
 // revocationEndpoint parses the OIDC Provider claims from the discovery document
 // and tries to find the revocation_endpoint.
-func revocationEndpoint(p oidc.IdProvider) (string, error) {
+func revocationEndpoint(p oidc.ClaimProvider) (string, error) {
 	claims := struct {
 		RevocationEndpoint string `json:"revocation_endpoint"`
 	}{}

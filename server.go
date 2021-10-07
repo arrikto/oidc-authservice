@@ -205,7 +205,6 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// UserInfo endpoint to get claims
-	claims := map[string]interface{}{}
 	oidcUserInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
@@ -213,7 +212,12 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = oidcUserInfo.Claims(&claims); err != nil {
+	claims, err := oidc.NewClaims(
+		oidcUserInfo,
+		s.idTokenOpts.userIDClaim,
+		s.idTokenOpts.groupsClaim,
+	)
+	if err != nil {
 		logger.Errorf("Problem getting userinfo claims: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
 		return
@@ -226,23 +230,17 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
 
-	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
-	if !ok {
-		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.idTokenOpts.userIDClaim, claims)
+	userID, err := claims.UserID()
+	if err != nil {
+		logger.Errorf("%v", err)
 		returnMessage(w, http.StatusInternalServerError,
-			fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.idTokenOpts.userIDClaim))
+			fmt.Sprintf("%v", err))
 		return
 	}
 
-	groups := []string{}
-	groupsClaim := claims[s.idTokenOpts.groupsClaim]
-	if groupsClaim != nil {
-		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
-	}
-
 	session.Values[userSessionUserID] = userID
-	session.Values[userSessionGroups] = groups
-	session.Values[userSessionClaims] = claims
+	session.Values[userSessionGroups] = claims.Groups()
+	session.Values[userSessionClaims] = claims.Claims()
 	session.Values[userSessionIDToken] = rawIDToken
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
 	if err := session.Save(r, w); err != nil {

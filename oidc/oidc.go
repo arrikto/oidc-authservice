@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
@@ -33,4 +34,50 @@ func NewOidcProvider(ctx context.Context, u *url.URL) IdProvider {
 	}
 
 	return provider
+}
+
+type Claims struct {
+	rawClaims   map[string]interface{}
+	userIDClaim string
+	groupsClaim string
+}
+
+type ClaimProvider interface {
+	Claims(v interface{}) error
+}
+
+func NewClaims(cp ClaimProvider, userIDClaim, groupsClaim string) (Claims, error) {
+	c := Claims{
+		rawClaims:   map[string]interface{}{},
+		userIDClaim: userIDClaim,
+		groupsClaim: groupsClaim,
+	}
+	err := cp.Claims(&c.rawClaims)
+	return c, err
+}
+
+func (c *Claims) UserID() (string, error) {
+	claim := c.rawClaims[c.userIDClaim]
+	if claim == nil {
+		return "", errors.New("Couldn't find userID claim")
+	}
+	return claim.(string), nil
+}
+
+func (c *Claims) Groups() []string {
+	gc := c.rawClaims[c.groupsClaim]
+	if gc == nil {
+		return []string{}
+	}
+
+	in := gc.([]interface{})
+	res := []string{}
+	for _, elem := range in {
+		res = append(res, elem.(string))
+	}
+	return res
+}
+
+func (c *Claims) Claims() map[string]interface{} {
+	return c.rawClaims
 }

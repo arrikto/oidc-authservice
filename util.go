@@ -108,15 +108,3 @@ func userInfoToHeaders(info user.Info, opts *httpHeaderOpts, transformer *UserID
 	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
 	return res
 }
-
-func interfaceSliceToStringSlice(in []interface{}) []string {
-	if in == nil {
-		return nil
-	}
-
-	res := []string{}
-	for _, elem := range in {
-		res = append(res, elem.(string))
-	}
-	return res
-}

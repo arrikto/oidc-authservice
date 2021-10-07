@@ -38,27 +38,24 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		return nil, false, nil
 	}
 
-	var claims map[string]interface{}
-	if err := token.Claims(&claims); err != nil {
+	claims, err := oidc.NewClaims(token, s.userIDClaim, s.groupsClaim)
+	if err != nil {
 		logger.Errorf("retrieving user claims failed: %v", err)
 		return nil, false, nil
 	}
 
-	if claims[s.userIDClaim] == nil {
+	userID, err := claims.UserID()
+	if err != nil {
 		// No USERID_CLAIM, pass this authenticator
 		logger.Error("USERID_CLAIM doesn't exist in the id token")
 		return nil, false, nil
 	}
 
-	groups := []string{}
-	groupsClaim := claims[s.groupsClaim]
-	if groupsClaim != nil {
-		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
-	}
+	groups := claims.Groups()
 
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name:   claims[s.userIDClaim].(string),
+			Name:   userID,
 			Groups: groups,
 		},
 	}
