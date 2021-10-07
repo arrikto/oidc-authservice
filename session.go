@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/coreos/go-oidc"
+
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -82,7 +84,7 @@ func revokeSession(ctx context.Context, w http.ResponseWriter,
 // input, instead of polluting it with extra arguments.
 func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	session *sessions.Session, provider *oidc.Provider,
-	oauth2Config *oauth2.Config, caBundle []byte) error {
+	oauth2Config *oauth2.Config, tlsCfg svc.TlsConfig) error {
 
 	logger := logrus.StandardLogger()
 
@@ -92,7 +94,7 @@ func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
 	} else {
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		err := revokeTokens(setTLSContext(ctx, caBundle), _revocationEndpoint,
+		err := revokeTokens(tlsCfg.Context(ctx), _revocationEndpoint,
 			&token, oauth2Config.ClientID, oauth2Config.ClientSecret)
 		if err != nil {
 			return errors.Wrap(err, "Error revoking tokens")

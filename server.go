@@ -47,6 +47,7 @@ type server struct {
 	userIdTransformer      UserIDTransformer
 	caBundle               []byte
 	sessionSameSite        http.SameSite
+	tlsCfg                 svc.TlsConfig
 }
 
 // jwtClaimOpts specifies the location of the user's identity inside a JWT's
@@ -185,7 +186,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := s.tlsCfg.Context(r.Context())
 	// Exchange the authorization code with {access, refresh, id}_token
 	oauth2Tokens, err := s.oauth2Config.Exchange(ctx, authCode)
 	if err != nil {

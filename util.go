@@ -6,8 +6,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -86,25 +84,6 @@ func createNonce(length int) (string, error) {
 	}
 
 	return string(nonce), nil
-}
-
-func setTLSContext(ctx context.Context, caBundle []byte) context.Context {
-	if len(caBundle) == 0 {
-		return ctx
-	}
-	rootCAs, err := x509.SystemCertPool()
-	if err != nil {
-		log.Warning("Could not load system cert pool")
-		rootCAs = x509.NewCertPool()
-	}
-	if ok := rootCAs.AppendCertsFromPEM(caBundle); !ok {
-		log.Warning("Could not append custom CA bundle, using system certs only")
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{RootCAs: rootCAs},
-	}
-	tlsConf := &http.Client{Transport: tr}
-	return context.WithValue(ctx, oauth2.HTTPClient, tlsConf)
 }
 
 func mustParseURL(rawURL string) *url.URL {

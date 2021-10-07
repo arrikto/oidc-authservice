@@ -10,7 +10,8 @@ import (
 	"path"
 	"time"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -83,9 +84,11 @@ func main() {
 		}
 	}
 
+	tlsCfg := svc.TlsConfig(caBundle)
+
 	// OIDC Discovery
 	var provider *oidc.Provider
-	ctx := setTLSContext(context.Background(), caBundle)
+	ctx := tlsCfg.Context(context.Background())
 	for {
 		provider, err = oidc.NewProvider(ctx, c.ProviderURL.String())
 		if err == nil {
@@ -142,7 +145,7 @@ func main() {
 		cookie:                  userSessionCookie,
 		header:                  c.AuthHeader,
 		strictSessionValidation: c.StrictSessionValidation,
-		caBundle:                caBundle,
+		tlsCfg:                  tlsCfg,
 		provider:                provider,
 		oauth2Config:            oauth2Config,
 	}
@@ -151,11 +154,11 @@ func main() {
 
 	idTokenAuthenticator := &idTokenAuthenticator{
 		header:      c.IDTokenHeader,
-		caBundle:    caBundle,
 		provider:    provider,
 		clientID:    c.ClientID,
 		userIDClaim: c.UserIDClaim,
 		groupsClaim: c.GroupsClaim,
+		tlsCfg:      tlsCfg,
 	}
 
 	// Set the server values.
@@ -182,13 +185,13 @@ func main() {
 		userIdTransformer:    c.UserIDTransformer,
 		sessionMaxAgeSeconds: c.SessionMaxAge,
 		authHeader:           c.AuthHeader,
-		caBundle:             caBundle,
 		authenticators: []authenticator.Request{
 			sessionAuthenticator,
 			idTokenAuthenticator,
 			k8sAuthenticator,
 		},
 		authorizers: []Authorizer{groupsAuthorizer},
+		tlsCfg:      tlsCfg,
 	}
 	switch c.SessionSameSite {
 	case "None":
