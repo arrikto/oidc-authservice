@@ -16,7 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/shared"
-	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -83,16 +82,6 @@ func main() {
 		}
 	}
 
-	tlsCfg := svc.TlsConfig(caBundle)
-
-	// OIDC Discovery
-	ctx := tlsCfg.Context(context.Background())
-	var provider = oidc.NewOidcProvider(ctx, c.ProviderURL)
-	endpoint := provider.Endpoint()
-	if len(c.OIDCAuthURL.String()) > 0 {
-		endpoint.AuthURL = c.OIDCAuthURL.String()
-	}
-
 	// Setup session store
 	// Using BoltDB by default
 	store, err := newBoltDBSessionStore(c.SessionStorePath,
@@ -121,42 +110,41 @@ func main() {
 		log.Fatalf("Error creating K8s authenticator: %v", err)
 	}
 
-	// Get OIDC Session Authenticator
-	oauth2Config := &oauth2.Config{
-		ClientID:     c.ClientID,
-		ClientSecret: c.ClientSecret,
-		Endpoint:     endpoint,
-		RedirectURL:  c.RedirectURL.String(),
-		Scopes:       c.OIDCScopes,
-	}
+	tlsCfg := svc.TlsConfig(caBundle)
+
+	sessionManager := oidc.NewSessionManager(
+		tlsCfg.Context(context.Background()),
+		c.ClientID,
+		c.ClientSecret,
+		c.ProviderURL,
+		c.OIDCAuthURL,
+		c.RedirectURL,
+		c.OIDCScopes,
+	)
 
 	sessionAuthenticator := &sessionAuthenticator{
 		store:                   store,
-		cookie:                  userSessionCookie,
+		cookie:                  oidc.UserSessionCookie,
 		header:                  c.AuthHeader,
 		strictSessionValidation: c.StrictSessionValidation,
 		tlsCfg:                  tlsCfg,
-		provider:                provider,
-		oauth2Config:            oauth2Config,
+		sm:                      sessionManager,
 	}
 
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
 	idTokenAuthenticator := &idTokenAuthenticator{
-		header:      c.IDTokenHeader,
-		provider:    provider,
-		clientID:    c.ClientID,
-		userIDClaim: c.UserIDClaim,
-		groupsClaim: c.GroupsClaim,
-		tlsCfg:      tlsCfg,
+		header:         c.IDTokenHeader,
+		userIDClaim:    c.UserIDClaim,
+		groupsClaim:    c.GroupsClaim,
+		sessionManager: sessionManager,
+		tlsCfg:         tlsCfg,
 	}
 
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
 
 	*s = server{
-		provider:     provider,
-		oauth2Config: oauth2Config,
 		// TODO: Add support for Redis
 		store:                  store,
 		oidcStateStore:         oidc.NewOidcStateStore(oidcStateStore),
@@ -180,8 +168,9 @@ func main() {
 			idTokenAuthenticator,
 			k8sAuthenticator,
 		},
-		authorizers: []Authorizer{groupsAuthorizer},
-		tlsCfg:      tlsCfg,
+		authorizers:    []Authorizer{groupsAuthorizer},
+		tlsCfg:         tlsCfg,
+		sessionManager: sessionManager,
 	}
 	switch c.SessionSameSite {
 	case "None":

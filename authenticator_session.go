@@ -28,12 +28,8 @@ type sessionAuthenticator struct {
 	// tlsCfg manages the bundles for CAs to trust when talking with the
 	// OIDC Provider. Relevant only when strictSessionValidation is enabled.
 	tlsCfg svc.TlsConfig
-	// oauth2Config is the config to use when talking with the OIDC Provider.
-	// Relevant only when strictSessionValidation is enabled.
-	oauth2Config *oauth2.Config
-	// provider is the OIDC Provider.
-	// Relevant only when strictSessionValidation is enabled.
-	provider oidc.IdProvider
+	// sm is responsible for managing OIDC sessions
+	sm oidc.SessionManager
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
@@ -53,9 +49,8 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	// User is logged in
 	if sa.strictSessionValidation {
 		ctx := sa.tlsCfg.Context(r.Context())
-		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		// TokenSource takes care of automatically renewing the access token.
-		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
+		token := session.Values[oidc.UserSessionOAuth2Tokens].(oauth2.Token)
+		_, err := sa.sm.GetUserInfo(ctx, &token)
 		if err != nil {
 			var reqErr *svc.RequestError
 			if !errors.As(err, &reqErr) {
@@ -70,8 +65,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			// access to the ResponseWriter and thus can't set a cookie. This
 			// means that the cookie will remain at the user's browser but it
 			// will be replaced after the user logs in again.
-			err = revokeOIDCSession(ctx, httptest.NewRecorder(), session,
-				sa.provider, sa.oauth2Config, sa.tlsCfg)
+			err = sa.sm.RevokeSession(ctx, httptest.NewRecorder(), session)
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
 			}
@@ -82,14 +76,14 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	// Data written at a previous version might not have groups stored, so
 	// default to an empty list of strings.
 	// TODO: Consolidate all session serialization/deserialization in one place.
-	groups, ok := session.Values[userSessionGroups].([]string)
+	groups, ok := session.Values[oidc.UserSessionGroups].([]string)
 	if !ok {
 		groups = []string{}
 	}
 
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name:   session.Values[userSessionUserID].(string),
+			Name:   session.Values[oidc.UserSessionUserID].(string),
 			Groups: groups,
 		},
 	}

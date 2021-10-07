@@ -11,12 +11,11 @@ import (
 )
 
 type idTokenAuthenticator struct {
-	header      string // header name where id token is stored
-	provider    oidc.IdProvider
-	clientID    string // need client id to verify the id token
-	userIDClaim string // retrieve the userid if the claim exists
-	groupsClaim string
-	tlsCfg      svc.TlsConfig
+	header         string // header name where id token is stored
+	userIDClaim    string // retrieve the userid if the claim exists
+	groupsClaim    string
+	sessionManager oidc.SessionManager
+	tlsCfg         svc.TlsConfig
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
@@ -31,8 +30,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	ctx := s.tlsCfg.Context(r.Context())
 
 	// Verifying received ID token
-	verifier := s.provider.Verifier(oidc.NewOidcConfig(s.clientID))
-	token, err := verifier.Verify(ctx, bearer)
+	token, err := s.sessionManager.Verify(ctx, bearer)
 	if err != nil {
 		logger.Errorf("id-token verification failed: %v", err)
 		return nil, false, nil
