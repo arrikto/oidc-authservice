@@ -7,7 +7,6 @@ import (
 	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -16,12 +15,7 @@ import (
 
 type sessionAuthenticator struct {
 	// store is the session store.
-	store sessions.Store
-	// cookie is the name of the cookie that holds the session value.
-	cookie string
-	// header is the header to check as an alternative to finding the session
-	// value.
-	header string
+	store oidc.SessionStore
 	// strictSessionValidation mode checks the validity of the access token
 	// connected with the session on every request.
 	strictSessionValidation bool
@@ -36,7 +30,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	logger := logger.ForRequest(r)
 
 	// Get session from header or cookie
-	session, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
+	session, err := sa.store.SessionFromRequest(r)
 
 	// Check if user session is valid
 	if err != nil {

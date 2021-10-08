@@ -122,10 +122,18 @@ func main() {
 		c.OIDCScopes,
 	)
 
+	sessionStore := oidc.NewSessionStore(
+		store,
+		c.AuthHeader,
+		oidc.UserSessionCookie,
+		c.UserIDClaim,
+		c.GroupsClaim,
+		c.SessionMaxAge,
+		c.SessionSameSite,
+	)
+
 	sessionAuthenticator := &sessionAuthenticator{
-		store:                   store,
-		cookie:                  oidc.UserSessionCookie,
-		header:                  c.AuthHeader,
+		store:                   sessionStore,
 		strictSessionValidation: c.StrictSessionValidation,
 		tlsCfg:                  tlsCfg,
 		sm:                      sessionManager,
@@ -146,23 +154,17 @@ func main() {
 
 	*s = server{
 		// TODO: Add support for Redis
-		store:                  store,
+		sessionStore:           sessionStore,
 		oidcStateStore:         oidc.NewOidcStateStore(oidcStateStore),
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
-		idTokenOpts: jwtClaimOpts{
-			userIDClaim: c.UserIDClaim,
-			groupsClaim: c.GroupsClaim,
-		},
 		upstreamHTTPHeaderOpts: httpHeaderOpts{
 			userIDHeader: c.UserIDHeader,
 			userIDPrefix: c.UserIDPrefix,
 			groupsHeader: c.GroupsHeader,
 		},
-		userIdTransformer:    c.UserIDTransformer,
-		sessionMaxAgeSeconds: c.SessionMaxAge,
-		authHeader:           c.AuthHeader,
+		userIdTransformer: c.UserIDTransformer,
 		authenticators: []authenticator.Request{
 			sessionAuthenticator,
 			idTokenAuthenticator,
@@ -171,15 +173,6 @@ func main() {
 		authorizers:    []Authorizer{groupsAuthorizer},
 		tlsCfg:         tlsCfg,
 		sessionManager: sessionManager,
-	}
-	switch c.SessionSameSite {
-	case "None":
-		s.sessionSameSite = http.SameSiteNoneMode
-	case "Strict":
-		s.sessionSameSite = http.SameSiteStrictMode
-	default:
-		// Use Lax mode as the default
-		s.sessionSameSite = http.SameSiteLaxMode
 	}
 
 	// Setup complete, mark server ready

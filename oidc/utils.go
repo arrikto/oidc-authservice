@@ -3,9 +3,18 @@ package oidc
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"golang.org/x/oauth2"
 )
+
+func GetBearerToken(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "Bearer ") {
+		return strings.TrimPrefix(value, "Bearer ")
+	}
+	return value
+}
 
 func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	client := http.DefaultClient

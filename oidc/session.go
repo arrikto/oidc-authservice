@@ -2,10 +2,12 @@ package oidc
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
@@ -20,6 +22,9 @@ const (
 	UserSessionClaims       = "claims"
 	UserSessionIDToken      = "idtoken"
 	UserSessionOAuth2Tokens = "oauth2tokens"
+
+	SessionErrorUnauth   = 0
+	SessionErrorNotFound = 1
 )
 
 // revokeSession revokes the given session.
@@ -37,6 +42,154 @@ func RevokeSession(ctx context.Context, w http.ResponseWriter,
 		return errors.Wrap(err, "Couldn't delete user session")
 	}
 	return nil
+}
+
+type SessionError struct {
+	Message string
+	Code    int32
+}
+
+func (e *SessionError) Error() string {
+	return e.Message
+}
+
+type SessionStore struct {
+	store                    sessions.Store
+	authHeader               string
+	sessionCookie            string
+	userIDClaim, groupsClaim string
+	sessionMaxAgeSeconds     int
+	sessionSameSite          http.SameSite
+}
+
+func NewSessionStore(
+	store sessions.Store,
+	authHeader string,
+	sessionCookie string,
+	userIDClaim, groupsClaim string,
+	sessionMaxAgeSeconds int,
+	sessionSameSiteCfg string) SessionStore {
+
+	// Use Lax mode as the default
+	sessionSameSite := http.SameSiteLaxMode
+	switch sessionSameSiteCfg {
+	case "None":
+		sessionSameSite = http.SameSiteNoneMode
+	case "Strict":
+		sessionSameSite = http.SameSiteStrictMode
+	}
+	return SessionStore{
+		store:                store,
+		authHeader:           authHeader,
+		sessionCookie:        sessionCookie,
+		userIDClaim:          userIDClaim,
+		groupsClaim:          groupsClaim,
+		sessionMaxAgeSeconds: sessionMaxAgeSeconds,
+		sessionSameSite:      sessionSameSite,
+	}
+}
+
+// SessionFromRequestHeader returns a session which has its key in a header.
+// XXX: Because the session library we use doesn't support getting a session
+// by key, we need to fake a cookie
+func (s *SessionStore) sessionFromID(id string) (*sessions.Session, error) {
+	r := &http.Request{Header: make(http.Header)}
+	r.AddCookie(&http.Cookie{
+		// XXX: This is needed because the sessions lib we use also encodes
+		// cookies with securecookie, which requires passing the correct cookie
+		// name during decryption.
+		Name:   UserSessionCookie,
+		Value:  id,
+		Path:   "/",
+		MaxAge: 1,
+	})
+
+	return s.store.Get(r, UserSessionCookie)
+}
+
+func (s *SessionStore) NewSession(
+	r *http.Request,
+	w http.ResponseWriter,
+	userInfo *UserInfo,
+	rawIDToken string,
+	oauth2Tokens *oauth2.Token) (*sessions.Session, error) {
+	claims, err := NewClaims(
+		userInfo,
+		s.userIDClaim,
+		s.groupsClaim,
+	)
+
+	if err != nil {
+		return nil, errors.New("Not able to fetch userinfo claims")
+	}
+
+	// User is authenticated, create new session.
+	session := sessions.NewSession(s.store, UserSessionCookie)
+	session.Options.MaxAge = s.sessionMaxAgeSeconds
+	session.Options.Path = "/"
+	// Extra layer of CSRF protection
+	session.Options.SameSite = s.sessionSameSite
+
+	userID, err := claims.UserID()
+	if err != nil {
+		return nil, err
+	}
+
+	session.Values[UserSessionUserID] = userID
+	session.Values[UserSessionGroups] = claims.Groups()
+	session.Values[UserSessionClaims] = claims.Claims()
+	session.Values[UserSessionIDToken] = rawIDToken
+	session.Values[UserSessionOAuth2Tokens] = oauth2Tokens
+
+	return session, session.Save(r, w)
+}
+
+// SessionForLogout looks for the session id to log out
+func (s *SessionStore) SessionForLogout(r *http.Request) (*sessions.Session, error) {
+	sessionID := GetBearerToken(r.Header.Get(s.authHeader))
+	if sessionID == "" {
+		message := fmt.Sprintf(
+			"Request doesn't have a session value in header '%s'", s.authHeader)
+		return nil, &SessionError{Message: message, Code: SessionErrorUnauth}
+	}
+
+	session, err := s.sessionFromID(sessionID)
+	if err != nil {
+		message := fmt.Sprintf("Couldn't get user session: %v", err)
+		return nil, &SessionError{Message: message, Code: SessionErrorNotFound}
+	}
+
+	if session.IsNew {
+		message := "Request doesn't have a valid session."
+		return nil, &SessionError{Message: message, Code: SessionErrorUnauth}
+	}
+
+	return session, nil
+}
+
+// SessionFromRequest looks for a session id in a header and a cookie, in that
+// order. If it doesn't find a valid session in the header, it will then check
+// the cookie.
+func (s *SessionStore) SessionFromRequest(r *http.Request) (*sessions.Session, error) {
+	logger := logger.ForRequest(r)
+
+	// Try to get session from header
+	sessionID := GetBearerToken(r.Header.Get(s.authHeader))
+
+	if sessionID != "" {
+		session, err := s.sessionFromID(sessionID)
+		if err == nil && !session.IsNew {
+			logger.Infof("Loading session from header %s", s.authHeader)
+			return session, nil
+		}
+
+		logger.Debugf(
+			"Header %s didn't contain a valid session id: %v", s.authHeader, err)
+	}
+
+	// Header failed, try to get session from cookie
+	logger.Infof("Loading session from cookie %s", s.sessionCookie)
+	return s.store.Get(r, s.sessionCookie)
 }
 
 type SessionManager struct {

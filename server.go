@@ -10,7 +10,6 @@ import (
 	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -23,29 +22,18 @@ var (
 )
 
 type server struct {
-	store                  sessions.Store
+	sessionStore           oidc.SessionStore
 	oidcStateStore         oidc.OidcStateStore
 	authenticators         []authenticator.Request
 	authorizers            []Authorizer
 	afterLoginRedirectURL  string
 	homepageURL            string
 	afterLogoutRedirectURL string
-	sessionMaxAgeSeconds   int
-	authHeader             string
-	idTokenOpts            jwtClaimOpts
 	upstreamHTTPHeaderOpts httpHeaderOpts
 	userIdTransformer      UserIDTransformer
 	caBundle               []byte
-	sessionSameSite        http.SameSite
 	sessionManager         oidc.SessionManager
 	tlsCfg                 svc.TlsConfig
-}
-
-// jwtClaimOpts specifies the location of the user's identity inside a JWT's
-// claims.
-type jwtClaimOpts struct {
-	userIDClaim string
-	groupsClaim string
 }
 
 // httpHeaderOpts specifies the location of the user's identity inside HTTP
@@ -101,7 +89,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		// the session authenticator.
 		if !allowed {
 			logger.Infof("Authorizer '%d' denied the request with reason: '%s'", i, reason)
-			session, err := sessionFromRequest(r, s.store, oidc.UserSessionCookie, s.authHeader)
+			session, err := s.sessionStore.SessionFromRequest(r)
 			if err != nil {
 				logger.Errorf("Error getting session for request: %v", err)
 			}
@@ -218,41 +206,11 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := oidc.NewClaims(
-		oidcUserInfo,
-		s.idTokenOpts.userIDClaim,
-		s.idTokenOpts.groupsClaim,
-	)
-	if err != nil {
-		logger.Errorf("Problem getting userinfo claims: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
-		return
-	}
-
 	// User is authenticated, create new session.
-	session := sessions.NewSession(s.store, oidc.UserSessionCookie)
-	session.Options.MaxAge = s.sessionMaxAgeSeconds
-	session.Options.Path = "/"
-	// Extra layer of CSRF protection
-	session.Options.SameSite = s.sessionSameSite
-
-	userID, err := claims.UserID()
+	_, err = s.sessionStore.NewSession(r, w, oidcUserInfo, rawIDToken, oauth2Tokens)
 	if err != nil {
-		logger.Errorf("%v", err)
-		returnMessage(w, http.StatusInternalServerError,
-			fmt.Sprintf("%v", err))
-		return
-	}
-
-	session.Values[oidc.UserSessionUserID] = userID
-	session.Values[oidc.UserSessionGroups] = claims.Groups()
-	session.Values[oidc.UserSessionClaims] = claims.Claims()
-	session.Values[oidc.UserSessionIDToken] = rawIDToken
-	session.Values[oidc.UserSessionOAuth2Tokens] = oauth2Tokens
-	if err := session.Save(r, w); err != nil {
-		logger.Errorf("Couldn't create user session: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Error creating user session")
-		return
+		logger.Errorf("failed to create session: %v", err)
+		returnMessage(w, http.StatusInternalServerError, "failed to create session")
 	}
 
 	// Getting the firstVisitedURL from the OIDC state
@@ -275,11 +233,11 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	logger := logger.ForRequest(r)
 
-	session, err := SessionForLogout(r, s.store, s.authHeader)
+	session, err := s.sessionStore.SessionForLogout(r)
 	if err != nil {
 		logger.Errorf(err.Error())
-		var serr SessionError
-		if errors.As(err, &serr) && serr.Code == SessionErrorUnauth {
+		var serr oidc.SessionError
+		if errors.As(err, &serr) && serr.Code == oidc.SessionErrorUnauth {
 			w.WriteHeader(http.StatusUnauthorized)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)

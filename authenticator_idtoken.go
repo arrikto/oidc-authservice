@@ -22,7 +22,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	logger := logger.ForRequest(r)
 
 	// get id-token from header
-	bearer := getBearerToken(r.Header.Get(s.header))
+	bearer := oidc.GetBearerToken(r.Header.Get(s.header))
 	if len(bearer) == 0 {
 		return nil, false, nil
 	}

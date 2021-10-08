@@ -82,14 +82,6 @@ func resolvePathReference(u *url.URL, p string) *url.URL {
 	return &ret
 }
 
-func getBearerToken(value string) string {
-	value = strings.TrimSpace(value)
-	if strings.HasPrefix(value, "Bearer ") {
-		return strings.TrimPrefix(value, "Bearer ")
-	}
-	return value
-}
-
 func userInfoToHeaders(info user.Info, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
 	res := map[string]string{}
 	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(info.GetName())
