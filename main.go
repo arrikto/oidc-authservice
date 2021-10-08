@@ -21,9 +21,6 @@ import (
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-// Issue: https://github.com/gorilla/sessions/issues/200
-const secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
-
 func main() {
 
 	c, err := parseConfig()
