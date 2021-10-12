@@ -17,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/shared"
-	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 func main() {
@@ -100,12 +99,7 @@ func main() {
 	}
 	defer oidcStateStore.Close()
 
-	// Get Kubernetes authenticator
-	restConfig, err := clientconfig.GetConfig()
-	if err != nil {
-		log.Fatalf("Error getting K8s config: %v", err)
-	}
-	k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(restConfig, c.Audiences)
+	k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(c.Audiences)
 	if err != nil {
 		log.Fatalf("Error creating K8s authenticator: %v", err)
 	}

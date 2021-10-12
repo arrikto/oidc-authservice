@@ -8,7 +8,7 @@ import (
 	kauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 const (
@@ -20,13 +20,19 @@ type kubernetesAuthenticator struct {
 	authenticator kauthenticator.Request
 }
 
-func NewKubernetesAuthenticator(c *rest.Config, aud []string) (Authenticator, error) {
-	config := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:               false,
-		TokenAccessReviewClient: kubernetes.NewForConfigOrDie(c).AuthenticationV1().TokenReviews(),
-		APIAudiences:            aud,
+func NewKubernetesAuthenticator(aud []string) (Authenticator, error) {
+	restConfig, err := config.GetConfig()
+	if err != nil {
+		return nil, err
 	}
-	k8sAuthenticator, _, err := config.New()
+
+	authConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
+		Anonymous: false,
+		TokenAccessReviewClient: kubernetes.NewForConfigOrDie(
+			restConfig).AuthenticationV1().TokenReviews(),
+		APIAudiences: aud,
+	}
+	k8sAuthenticator, _, err := authConfig.New()
 	return &kubernetesAuthenticator{audiences: aud, authenticator: k8sAuthenticator}, err
 }
 
