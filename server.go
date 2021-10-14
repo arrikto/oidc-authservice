@@ -30,23 +30,22 @@ func init() {
 }
 
 type server struct {
-	provider                *oidc.Provider
-	oauth2Config            *oauth2.Config
-	store                   sessions.Store
-	oidcStateStore          sessions.Store
-	authenticators          []authenticator.Request
-	authorizers             []Authorizer
-	afterLoginRedirectURL   string
-	homepageURL             string
-	afterLogoutRedirectURL  string
-	sessionMaxAgeSeconds    int
-	strictSessionValidation bool
-	authHeader              string
-	idTokenOpts             jwtClaimOpts
-	upstreamHTTPHeaderOpts  httpHeaderOpts
-	userIdTransformer       UserIDTransformer
-	caBundle                []byte
-	sessionSameSite         http.SameSite
+	provider               *oidc.Provider
+	oauth2Config           *oauth2.Config
+	store                  sessions.Store
+	oidcStateStore         sessions.Store
+	authenticators         []authenticator.Request
+	authorizers            []Authorizer
+	afterLoginRedirectURL  string
+	homepageURL            string
+	afterLogoutRedirectURL string
+	sessionMaxAgeSeconds   int
+	authHeader             string
+	idTokenOpts            jwtClaimOpts
+	upstreamHTTPHeaderOpts httpHeaderOpts
+	userIdTransformer      UserIDTransformer
+	caBundle               []byte
+	sessionSameSite        http.SameSite
 }
 
 // jwtClaimOpts specifies the location of the user's identity inside a JWT's
