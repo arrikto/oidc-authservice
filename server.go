@@ -175,7 +175,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
-
+	w.Header().Add("X-OIDC-Device-Flow-Url", s.sessionManager.DeviceAuthURL())
 	http.Redirect(w, r, s.sessionManager.AuthCodeURL(c.Value), http.StatusFound)
 }
 
@@ -231,7 +231,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verifying received ID token
-	_, err = s.sessionManager.Verify(ctx, rawIDToken)
+	_, err = s.sessionManager.Verify(ctx, rawIDToken, "")
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Unable to verify ID token.")

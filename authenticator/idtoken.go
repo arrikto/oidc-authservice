@@ -32,6 +32,8 @@ func NewIdTokenAuthenticator(
 func (s *idTokenAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {
 	logger := logger.ForRequest(r)
 
+	clientID := r.Header.Get("X-OIDC-Client-Id")
+
 	// get id-token from header
 	bearer := oidc.GetBearerToken(r.Header.Get(s.header))
 	if len(bearer) == 0 {
@@ -41,7 +43,7 @@ func (s *idTokenAuthenticator) Authenticate(w http.ResponseWriter, r *http.Reque
 	ctx := s.tlsCfg.Context(r.Context())
 
 	// Verifying received ID token
-	token, err := s.sessionManager.Verify(ctx, bearer)
+	token, err := s.sessionManager.Verify(ctx, bearer, clientID)
 	if err != nil {
 		logger.Errorf("id-token verification failed: %v", err)
 		return nil, nil

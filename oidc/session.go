@@ -199,8 +199,9 @@ func (s *SessionStore) SessionFromRequest(r *http.Request) (*sessions.Session, e
 }
 
 type SessionManager struct {
-	provider     *oidc.Provider
-	oauth2Config *oauth2.Config
+	provider      *oidc.Provider
+	oauth2Config  *oauth2.Config
+	deviceAuthUrl string
 }
 
 func makeProvider(ctx context.Context, providerURL *url.URL) *oidc.Provider {
@@ -238,13 +239,18 @@ func NewSessionManager(ctx context.Context,
 	}
 
 	return SessionManager{
-		provider:     provider,
-		oauth2Config: oauth2Config,
+		provider:      provider,
+		oauth2Config:  oauth2Config,
+		deviceAuthUrl: providerURL.String() + "/device/code",
 	}
 }
 
 func (s *SessionManager) AuthCodeURL(state string) string {
 	return s.oauth2Config.AuthCodeURL(state)
+}
+
+func (s *SessionManager) DeviceAuthURL() string {
+	return s.deviceAuthUrl
 }
 
 func (s *SessionManager) GetUserInfo(
@@ -284,7 +290,11 @@ func (s *SessionManager) RevokeSession(
 	return RevokeSession(ctx, w, session)
 }
 
-func (s *SessionManager) Verify(ctx context.Context, idToken string) (*oidc.IDToken, error) {
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
+func (s *SessionManager) Verify(
+	ctx context.Context, idToken, clientID string) (*oidc.IDToken, error) {
+	if clientID == "" {
+		clientID = s.oauth2Config.ClientID
+	}
+	verifier := s.provider.Verifier(&oidc.Config{ClientID: clientID})
 	return verifier.Verify(ctx, idToken)
 }
