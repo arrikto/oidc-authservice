@@ -30,6 +30,8 @@ type config struct {
 	AfterLoginURL        *url.URL `split_words:"true"`
 	AfterLogoutURL       *url.URL `split_words:"true"`
 
+	Authenticators []string `split_words:"true", default:"session,idtoken,kubernetes"`
+
 	// Identity Headers
 	UserIDHeader      string            `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
 	GroupsHeader      string            `split_words:"true" default:"kubeflow-groups"`

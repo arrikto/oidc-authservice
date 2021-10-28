@@ -99,9 +99,20 @@ func main() {
 	}
 	defer oidcStateStore.Close()
 
-	k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(c.Audiences)
-	if err != nil {
-		log.Fatalf("Error creating K8s authenticator: %v", err)
+	enabledAuthenticators := map[string]bool{}
+	for _, authenticator := range c.Authenticators {
+		enabledAuthenticators[authenticator] = true
+	}
+
+	authenticators := []authenticator.Authenticator{}
+
+	if enabledAuthenticators["kubernetes"] {
+		k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(c.Audiences)
+		if err != nil {
+			log.Fatalf("Error creating K8s authenticator: %v", err)
+		}
+
+		authenticators = append(authenticators, k8sAuthenticator)
 	}
 
 	tlsCfg := svc.TlsConfig(caBundle)
@@ -126,22 +137,28 @@ func main() {
 		c.SessionSameSite,
 	)
 
-	sessionAuthenticator := authenticator.NewSessionAuthenticator(
-		sessionStore,
-		c.StrictSessionValidation,
-		tlsCfg,
-		sessionManager,
-	)
+	if enabledAuthenticators["session"] {
+		sessionAuthenticator := authenticator.NewSessionAuthenticator(
+			sessionStore,
+			c.StrictSessionValidation,
+			tlsCfg,
+			sessionManager,
+		)
+		authenticators = append(authenticators, sessionAuthenticator)
+	}
 
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
-	idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
-		c.IDTokenHeader,
-		c.UserIDClaim,
-		c.GroupsClaim,
-		sessionManager,
-		tlsCfg,
-	)
+	if enabledAuthenticators["idtoken"] {
+		idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
+			c.IDTokenHeader,
+			c.UserIDClaim,
+			c.GroupsClaim,
+			sessionManager,
+			tlsCfg,
+		)
+		authenticators = append(authenticators, idTokenAuthenticator)
+	}
 
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
@@ -159,14 +176,10 @@ func main() {
 			groupsHeader: c.GroupsHeader,
 		},
 		userIdTransformer: c.UserIDTransformer,
-		authenticators: []authenticator.Authenticator{
-			sessionAuthenticator,
-			idTokenAuthenticator,
-			k8sAuthenticator,
-		},
-		authorizers:    []Authorizer{groupsAuthorizer},
-		tlsCfg:         tlsCfg,
-		sessionManager: sessionManager,
+		authenticators:    authenticators,
+		authorizers:       []Authorizer{groupsAuthorizer},
+		tlsCfg:            tlsCfg,
+		sessionManager:    sessionManager,
 	}
 
 	// Setup complete, mark server ready
