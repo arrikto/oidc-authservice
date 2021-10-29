@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 )
@@ -36,7 +36,7 @@ func (u *UserInfo) Claims(v interface{}) error {
 // contacting the UserInfo endpoint.
 //
 // [1]: https://github.com/coreos/go-oidc/blob/v2.1.0/oidc.go#L180
-func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth2.TokenSource) (*UserInfo, error) {
+func GetUserInfo(ctx context.Context, provider oidc.IdProvider, tokenSource oauth2.TokenSource) (*UserInfo, error) {
 
 	discoveryClaims := &struct {
 		UserInfoURL string `json:"userinfo_endpoint"`

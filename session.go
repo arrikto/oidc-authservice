@@ -5,9 +5,8 @@ import (
 	"net/http"
 
 	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/coreos/go-oidc"
-
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -84,7 +83,7 @@ func revokeSession(ctx context.Context, w http.ResponseWriter,
 // TODO: In the future, we may want to make this function take a function as
 // input, instead of polluting it with extra arguments.
 func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
-	session *sessions.Session, provider *oidc.Provider,
+	session *sessions.Session, provider oidc.IdProvider,
 	oauth2Config *oauth2.Config, tlsCfg svc.TlsConfig) error {
 
 	logger := logrus.StandardLogger()

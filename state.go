@@ -8,8 +8,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
+	"golang.org/x/oauth2"
 )
 
 const (
@@ -19,6 +21,11 @@ const (
 
 func init() {
 	gob.Register(State{})
+
+	// Register type for claims.
+	gob.Register(map[string]interface{}{})
+	gob.Register(oauth2.Token{})
+	gob.Register(oidc.IDToken{})
 }
 
 type State struct {

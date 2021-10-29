@@ -3,14 +3,13 @@
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
@@ -24,15 +23,8 @@ var (
 	SessionLogoutPath = "/logout"
 )
 
-func init() {
-	// Register type for claims.
-	gob.Register(map[string]interface{}{})
-	gob.Register(oauth2.Token{})
-	gob.Register(oidc.IDToken{})
-}
-
 type server struct {
-	provider               *oidc.Provider
+	provider               oidc.IdProvider
 	oauth2Config           *oauth2.Config
 	store                  sessions.Store
 	oidcStateStore         sessions.Store
@@ -203,7 +195,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verifying received ID token
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
+	verifier := s.provider.Verifier(
+		oidc.NewOidcConfig(s.oauth2Config.ClientID))
 	_, err = verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)

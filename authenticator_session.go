@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 
 	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -33,7 +33,7 @@ type sessionAuthenticator struct {
 	oauth2Config *oauth2.Config
 	// provider is the OIDC Provider.
 	// Relevant only when strictSessionValidation is enabled.
-	provider *oidc.Provider
+	provider oidc.IdProvider
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
