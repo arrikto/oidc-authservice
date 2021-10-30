@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
@@ -75,7 +76,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			logger.Errorf("Error authenticating request using authenticator %d: %v", i, err)
 			// If we get a login expired error, it means the authenticator
 			// recognised a valid authentication method which has expired
-			var expiredErr *loginExpiredError
+			var expiredErr *svc.LoginExpiredError
 			if errors.As(err, &expiredErr) {
 				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
 				return
@@ -304,7 +305,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Error revoking tokens: %v", err)
 		statusCode := http.StatusInternalServerError
 		// If the server returned 503, return it as well as the client might want to retry
-		if reqErr, ok := errors.Cause(err).(*requestError); ok {
+		if reqErr, ok := errors.Cause(err).(*svc.RequestError); ok {
 			if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
 				statusCode = reqErr.Response.StatusCode
 			}

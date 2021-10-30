@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -45,11 +46,11 @@ func revokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.
 		log.Info("Attempting to revoke access token...")
 		err := revokeToken(ctx, revocationEndpoint, token.AccessToken, "access_token", clientID, clientSecret)
 		if err != nil {
-			code := err.(*requestError).Response.StatusCode
+			code := err.(*svc.RequestError).Response.StatusCode
 			if code == 400 {
 				bodyMap := make(map[string]string)
 
-				err2 := json.Unmarshal(err.(*requestError).Body, &bodyMap)
+				err2 := json.Unmarshal(err.(*svc.RequestError).Body, &bodyMap)
 				if err2 != nil {
 					err2 = errors.Wrap(err2, "Error while attempting to unmarshal the body of the request")
 					full_error := errors.New(err.Error() + err2.Error())
@@ -100,13 +101,13 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return &requestError{
+			return &svc.RequestError{
 				Response: resp,
 				Body:     body,
 				Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err)),
 			}
 		}
-		return &requestError{
+		return &svc.RequestError{
 			Response: resp,
 			Body:     body,
 			Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body)),

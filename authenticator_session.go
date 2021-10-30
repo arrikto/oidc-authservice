@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -55,7 +56,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		// TokenSource takes care of automatically renewing the access token.
 		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
-			var reqErr *requestError
+			var reqErr *svc.RequestError
 			if !errors.As(err, &reqErr) {
 				return nil, false, errors.Wrap(err, "UserInfo request failed unexpectedly")
 			}
