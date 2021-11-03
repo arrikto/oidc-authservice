@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
@@ -36,7 +37,7 @@ type sessionAuthenticator struct {
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Get session from header or cookie
 	session, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)

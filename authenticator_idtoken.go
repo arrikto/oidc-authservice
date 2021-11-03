@@ -3,8 +3,10 @@ package main
 import (
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/svc"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc"
+
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -19,7 +21,7 @@ type idTokenAuthenticator struct {
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// get id-token from header
 	bearer := getBearerToken(r.Header.Get(s.header))

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
@@ -66,8 +67,7 @@ type httpHeaderOpts struct {
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
-
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 	logger.Info("Authenticating request...")
 
 	var userInfo user.Info
@@ -140,7 +140,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
 func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *http.Request) {
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Initiate OIDC Flow with Authorization Request.
 	state, err := createState(r, w, s.oidcStateStore)
@@ -156,7 +156,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
 func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Get authorization code from authorization response.
 	var authCode = r.FormValue("code")
@@ -277,7 +277,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 // logout is the handler responsible for revoking the user's session.
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Only header auth allowed for this endpoint
 	sessionID := getBearerToken(r.Header.Get(s.authHeader))
@@ -351,7 +351,7 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := loggerForRequest(r)
+			logger := logger.ForRequest(r)
 			// Check whitelist
 			for _, prefix := range whitelist {
 				if strings.HasPrefix(r.URL.Path, prefix) {

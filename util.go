@@ -17,22 +17,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-func loggerForRequest(r *http.Request) *log.Entry {
-	return log.WithContext(r.Context()).WithFields(log.Fields{
-		"ip":      getUserIP(r),
-		"request": r.URL.String(),
-	})
-}
-
-func getUserIP(r *http.Request) string {
-	headerIP := r.Header.Get("X-Forwarded-For")
-	if headerIP != "" {
-		return headerIP
-	}
-
-	return strings.Split(r.RemoteAddr, ":")[0]
-}
-
 func returnHTML(w http.ResponseWriter, statusCode int, html string) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(statusCode)

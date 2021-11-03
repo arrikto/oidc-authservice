@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/coreos/go-oidc"
 
@@ -45,7 +46,7 @@ func sessionFromID(id string, store sessions.Store) (*sessions.Session, error) {
 func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	header string) (*sessions.Session, error) {
 
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 	// Try to get session from header
 	sessionID := getBearerToken(r.Header.Get(header))
 	if sessionID != "" {

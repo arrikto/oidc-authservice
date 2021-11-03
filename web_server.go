@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -89,7 +91,7 @@ func (s *WebServer) Start(addr string) error {
 // siteHandler returns an http.HandlerFunc that serves a given template
 func siteHandler(tmpl *template.Template, data interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := loggerForRequest(r)
+		logger := logger.ForRequest(r)
 		if err := tmpl.Execute(w, data); err != nil {
 			logger.Errorf("Error executing template: %v", err)
 		}
