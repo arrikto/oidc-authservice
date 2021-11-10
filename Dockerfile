@@ -13,6 +13,7 @@ RUN go mod download
 # Copy in the code and compile
 COPY *.go ./
 COPY authenticator ./authenticator
+COPY authorizer ./authorizer
 COPY logger ./logger
 COPY svc ./svc
 COPY oidc ./oidc

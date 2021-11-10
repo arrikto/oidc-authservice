@@ -10,6 +10,7 @@ import (
 	"path"
 
 	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/authorizer"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/gorilla/handlers"
@@ -147,7 +148,7 @@ func main() {
 		authenticators = append(authenticators, sessionAuthenticator)
 	}
 
-	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
+	groupsAuthorizer := authorizer.NewGroupsAuthorizer(c.GroupsAllowlist)
 
 	if enabledAuthenticators["idtoken"] {
 		idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
@@ -177,7 +178,7 @@ func main() {
 		},
 		userIdTransformer: c.UserIDTransformer,
 		authenticators:    authenticators,
-		authorizers:       []Authorizer{groupsAuthorizer},
+		authorizers:       []authorizer.Authorizer{groupsAuthorizer},
 		tlsCfg:            tlsCfg,
 		sessionManager:    sessionManager,
 	}

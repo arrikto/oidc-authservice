@@ -1,4 +1,4 @@
-package main
+package authorizer
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ type groupsAuthorizer struct {
 	allowed map[string]bool
 }
 
-func newGroupsAuthorizer(allowlist []string) Authorizer {
+func NewGroupsAuthorizer(allowlist []string) Authorizer {
 	allowed := map[string]bool{}
 	for _, g := range allowlist {
 		if g == wildcardMatcher {

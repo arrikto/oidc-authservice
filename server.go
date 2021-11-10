@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/authorizer"
 	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
@@ -24,7 +25,7 @@ type server struct {
 	sessionStore           oidc.SessionStore
 	oidcStateStore         oidc.OidcStateStore
 	authenticators         []authenticator.Authenticator
-	authorizers            []Authorizer
+	authorizers            []authorizer.Authorizer
 	afterLoginRedirectURL  string
 	homepageURL            string
 	afterLogoutRedirectURL string
