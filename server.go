@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
@@ -46,6 +48,7 @@ type server struct {
 	userIdTransformer      UserIDTransformer
 	caBundle               []byte
 	sessionSameSite        http.SameSite
+	tlsCfg                 svc.TlsConfig
 }
 
 // jwtClaimOpts specifies the location of the user's identity inside a JWT's
@@ -64,8 +67,7 @@ type httpHeaderOpts struct {
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
-
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 	logger.Info("Authenticating request...")
 
 	var userInfo user.Info
@@ -75,7 +77,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			logger.Errorf("Error authenticating request using authenticator %d: %v", i, err)
 			// If we get a login expired error, it means the authenticator
 			// recognised a valid authentication method which has expired
-			var expiredErr *loginExpiredError
+			var expiredErr *svc.LoginExpiredError
 			if errors.As(err, &expiredErr) {
 				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
 				return
@@ -138,7 +140,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
 func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *http.Request) {
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Initiate OIDC Flow with Authorization Request.
 	state, err := createState(r, w, s.oidcStateStore)
@@ -154,7 +156,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
 func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Get authorization code from authorization response.
 	var authCode = r.FormValue("code")
@@ -184,7 +186,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := s.tlsCfg.Context(r.Context())
 	// Exchange the authorization code with {access, refresh, id}_token
 	oauth2Tokens, err := s.oauth2Config.Exchange(ctx, authCode)
 	if err != nil {
@@ -275,7 +277,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 // logout is the handler responsible for revoking the user's session.
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Only header auth allowed for this endpoint
 	sessionID := getBearerToken(r.Header.Get(s.authHeader))
@@ -304,7 +306,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Error revoking tokens: %v", err)
 		statusCode := http.StatusInternalServerError
 		// If the server returned 503, return it as well as the client might want to retry
-		if reqErr, ok := errors.Cause(err).(*requestError); ok {
+		if reqErr, ok := errors.Cause(err).(*svc.RequestError); ok {
 			if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
 				statusCode = reqErr.Response.StatusCode
 			}
@@ -349,7 +351,7 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := loggerForRequest(r)
+			logger := logger.ForRequest(r)
 			// Check whitelist
 			for _, prefix := range whitelist {
 				if strings.HasPrefix(r.URL.Path, prefix) {

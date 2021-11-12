@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -23,9 +25,9 @@ type sessionAuthenticator struct {
 	// strictSessionValidation mode checks the validity of the access token
 	// connected with the session on every request.
 	strictSessionValidation bool
-	// caBundle specifies CAs to trust when talking with the OIDC Provider.
-	// Relevant only when strictSessionValidation is enabled.
-	caBundle []byte
+	// tlsCfg manages the bundles for CAs to trust when talking with the
+	// OIDC Provider. Relevant only when strictSessionValidation is enabled.
+	tlsCfg svc.TlsConfig
 	// oauth2Config is the config to use when talking with the OIDC Provider.
 	// Relevant only when strictSessionValidation is enabled.
 	oauth2Config *oauth2.Config
@@ -35,7 +37,7 @@ type sessionAuthenticator struct {
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// Get session from header or cookie
 	session, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
@@ -50,12 +52,12 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 	// User is logged in
 	if sa.strictSessionValidation {
-		ctx := setTLSContext(r.Context(), sa.caBundle)
+		ctx := sa.tlsCfg.Context(r.Context())
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
 		// TokenSource takes care of automatically renewing the access token.
 		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
-			var reqErr *requestError
+			var reqErr *svc.RequestError
 			if !errors.As(err, &reqErr) {
 				return nil, false, errors.Wrap(err, "UserInfo request failed unexpectedly")
 			}
@@ -69,7 +71,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			// means that the cookie will remain at the user's browser but it
 			// will be replaced after the user logs in again.
 			err = revokeOIDCSession(ctx, httptest.NewRecorder(), session,
-				sa.provider, sa.oauth2Config, sa.caBundle)
+				sa.provider, sa.oauth2Config, sa.tlsCfg)
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
 			}

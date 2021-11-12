@@ -3,22 +3,25 @@ package main
 import (
 	"net/http"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/coreos/go-oidc"
+
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type idTokenAuthenticator struct {
 	header      string // header name where id token is stored
-	caBundle    []byte
 	provider    *oidc.Provider
 	clientID    string // need client id to verify the id token
 	userIDClaim string // retrieve the userid if the claim exists
 	groupsClaim string
+	tlsCfg      svc.TlsConfig
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r)
+	logger := logger.ForRequest(r)
 
 	// get id-token from header
 	bearer := getBearerToken(r.Header.Get(s.header))
@@ -26,7 +29,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		return nil, false, nil
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := s.tlsCfg.Context(r.Context())
 
 	// Verifying received ID token
 	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.clientID})

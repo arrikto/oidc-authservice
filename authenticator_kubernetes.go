@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/svc"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/client-go/kubernetes"
@@ -36,7 +37,7 @@ func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*a
 
 	// If the request contains an expired token, we stop trying and return 403
 	if err != nil && strings.Contains(err.Error(), bearerTokenExpiredMsg) {
-		return nil, false, &loginExpiredError{Err: err}
+		return nil, false, &svc.LoginExpiredError{Err: err}
 	}
 	return resp, found, err
 }

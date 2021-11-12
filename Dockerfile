@@ -12,6 +12,8 @@ COPY go.sum .
 RUN go mod download
 # Copy in the code and compile
 COPY *.go ./
+COPY logger ./logger
+COPY svc ./svc
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /go/bin/oidc-authservice
 
 
