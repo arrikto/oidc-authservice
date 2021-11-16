@@ -3,18 +3,15 @@
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/coreos/go-oidc"
-	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
-	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -24,38 +21,19 @@ var (
 	SessionLogoutPath = "/logout"
 )
 
-func init() {
-	// Register type for claims.
-	gob.Register(map[string]interface{}{})
-	gob.Register(oauth2.Token{})
-	gob.Register(oidc.IDToken{})
-}
-
 type server struct {
-	provider               *oidc.Provider
-	oauth2Config           *oauth2.Config
-	store                  sessions.Store
-	oidcStateStore         sessions.Store
+	sessionStore           oidc.SessionStore
+	oidcStateStore         oidc.OidcStateStore
 	authenticators         []authenticator.Request
 	authorizers            []Authorizer
 	afterLoginRedirectURL  string
 	homepageURL            string
 	afterLogoutRedirectURL string
-	sessionMaxAgeSeconds   int
-	authHeader             string
-	idTokenOpts            jwtClaimOpts
 	upstreamHTTPHeaderOpts httpHeaderOpts
 	userIdTransformer      UserIDTransformer
 	caBundle               []byte
-	sessionSameSite        http.SameSite
+	sessionManager         oidc.SessionManager
 	tlsCfg                 svc.TlsConfig
-}
-
-// jwtClaimOpts specifies the location of the user's identity inside a JWT's
-// claims.
-type jwtClaimOpts struct {
-	userIDClaim string
-	groupsClaim string
 }
 
 // httpHeaderOpts specifies the location of the user's identity inside HTTP
@@ -111,12 +89,13 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		// the session authenticator.
 		if !allowed {
 			logger.Infof("Authorizer '%d' denied the request with reason: '%s'", i, reason)
-			session, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
+			session, err := s.sessionStore.SessionFromRequest(r)
 			if err != nil {
 				logger.Errorf("Error getting session for request: %v", err)
 			}
 			if !session.IsNew {
-				err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+				err := s.sessionManager.RevokeSession(
+					s.tlsCfg.Context(r.Context()), w, session)
 				if err != nil {
 					logger.Errorf("Failed to revoke session after authorization fail: %v", err)
 				}
@@ -143,14 +122,24 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 	logger := logger.ForRequest(r)
 
 	// Initiate OIDC Flow with Authorization Request.
-	state, err := createState(r, w, s.oidcStateStore)
+	// create state parameter from request and store it in cookie with the session key
+	if err := s.oidcStateStore.CreateState(r, w); err != nil {
+		logger.Errorf("Failed to save state in store: %v", err)
+		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
+		return
+	}
+
+	tempReq := &http.Request{Header: make(http.Header)}
+	tempReq.Header.Set("Cookie", w.Header().Get("Set-Cookie"))
+	c, err := tempReq.Cookie(oidc.OidcStateCookie)
+
 	if err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
 
-	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(state), http.StatusFound)
+	http.Redirect(w, r, s.sessionManager.AuthCodeURL(c.Value), http.StatusFound)
 }
 
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
@@ -177,7 +166,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If state is loaded, then it's correct, as it is saved by its id.
-	state, err := verifyState(r, w, s.oidcStateStore)
+	state, err := s.oidcStateStore.Verify(r, w)
 	if err != nil {
 		logger.Errorf("Failed to verify state parameter: %v", err)
 		returnMessage(w, http.StatusBadRequest, "CSRF check failed."+
@@ -187,8 +176,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := s.tlsCfg.Context(r.Context())
-	// Exchange the authorization code with {access, refresh, id}_token
-	oauth2Tokens, err := s.oauth2Config.Exchange(ctx, authCode)
+	oauth2Tokens, err := s.sessionManager.ExchangeCode(ctx, authCode)
 	if err != nil {
 		logger.Errorf("Failed to exchange authorization code with token: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
@@ -203,8 +191,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verifying received ID token
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
-	_, err = verifier.Verify(ctx, rawIDToken)
+	_, err = s.sessionManager.Verify(ctx, rawIDToken)
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Unable to verify ID token.")
@@ -212,50 +199,18 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// UserInfo endpoint to get claims
-	claims := map[string]interface{}{}
-	oidcUserInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
+	oidcUserInfo, err := s.sessionManager.GetUserInfo(ctx, oauth2Tokens)
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
 		return
 	}
 
-	if err = oidcUserInfo.Claims(&claims); err != nil {
-		logger.Errorf("Problem getting userinfo claims: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
-		return
-	}
-
 	// User is authenticated, create new session.
-	session := sessions.NewSession(s.store, userSessionCookie)
-	session.Options.MaxAge = s.sessionMaxAgeSeconds
-	session.Options.Path = "/"
-	// Extra layer of CSRF protection
-	session.Options.SameSite = s.sessionSameSite
-
-	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
-	if !ok {
-		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.idTokenOpts.userIDClaim, claims)
-		returnMessage(w, http.StatusInternalServerError,
-			fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.idTokenOpts.userIDClaim))
-		return
-	}
-
-	groups := []string{}
-	groupsClaim := claims[s.idTokenOpts.groupsClaim]
-	if groupsClaim != nil {
-		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
-	}
-
-	session.Values[userSessionUserID] = userID
-	session.Values[userSessionGroups] = groups
-	session.Values[userSessionClaims] = claims
-	session.Values[userSessionIDToken] = rawIDToken
-	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
-	if err := session.Save(r, w); err != nil {
-		logger.Errorf("Couldn't create user session: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Error creating user session")
-		return
+	_, err = s.sessionStore.NewSession(r, w, oidcUserInfo, rawIDToken, oauth2Tokens)
+	if err != nil {
+		logger.Errorf("failed to create session: %v", err)
+		returnMessage(w, http.StatusInternalServerError, "failed to create session")
 	}
 
 	// Getting the firstVisitedURL from the OIDC state
@@ -276,32 +231,23 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 // logout is the handler responsible for revoking the user's session.
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
-
 	logger := logger.ForRequest(r)
 
-	// Only header auth allowed for this endpoint
-	sessionID := getBearerToken(r.Header.Get(s.authHeader))
-	if sessionID == "" {
-		logger.Errorf("Request doesn't have a session value in header '%s'", s.authHeader)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Revoke user session.
-	session, err := sessionFromID(sessionID, s.store)
+	session, err := s.sessionStore.SessionForLogout(r)
 	if err != nil {
-		logger.Errorf("Couldn't get user session: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		logger.Errorf(err.Error())
+		var serr oidc.SessionError
+		if errors.As(err, &serr) && serr.Code == oidc.SessionErrorUnauth {
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
-	if session.IsNew {
-		logger.Warn("Request doesn't have a valid session.")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	logger = logger.WithField("userid", session.Values[userSessionUserID].(string))
+	logger = logger.WithField("userid", session.Values[oidc.UserSessionUserID].(string))
+	ctx := s.tlsCfg.Context(r.Context())
 
-	err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+	err = s.sessionManager.RevokeSession(ctx, w, session)
 	if err != nil {
 		logger.Errorf("Error revoking tokens: %v", err)
 		statusCode := http.StatusInternalServerError

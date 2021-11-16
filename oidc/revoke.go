@@ -1,4 +1,4 @@
-package main
+package oidc
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
@@ -18,7 +17,7 @@ import (
 
 // revocationEndpoint parses the OIDC Provider claims from the discovery document
 // and tries to find the revocation_endpoint.
-func revocationEndpoint(p *oidc.Provider) (string, error) {
+func revocationEndpoint(p ClaimProvider) (string, error) {
 	claims := struct {
 		RevocationEndpoint string `json:"revocation_endpoint"`
 	}{}
