@@ -11,8 +11,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/authenticator"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func returnHTML(w http.ResponseWriter, statusCode int, html string) {
@@ -82,9 +82,9 @@ func resolvePathReference(u *url.URL, p string) *url.URL {
 	return &ret
 }
 
-func userInfoToHeaders(info user.Info, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
+func userInfoToHeaders(user *authenticator.User, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
 	res := map[string]string{}
-	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(info.GetName())
-	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
+	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(user.Name)
+	res[opts.groupsHeader] = strings.Join(user.Groups, ",")
 	return res
 }

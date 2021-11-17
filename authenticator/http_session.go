@@ -1,4 +1,4 @@
-package main
+package authenticator
 
 import (
 	"net/http"
@@ -9,8 +9,6 @@ import (
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type sessionAuthenticator struct {
@@ -26,7 +24,21 @@ type sessionAuthenticator struct {
 	sm oidc.SessionManager
 }
 
-func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+func NewSessionAuthenticator(
+	store oidc.SessionStore,
+	strictSessionValidation bool,
+	tlsCfg svc.TlsConfig,
+	sessionManager oidc.SessionManager) Authenticator {
+
+	return &sessionAuthenticator{
+		store:                   store,
+		strictSessionValidation: strictSessionValidation,
+		tlsCfg:                  tlsCfg,
+		sm:                      sessionManager,
+	}
+}
+
+func (sa *sessionAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {
 	logger := logger.ForRequest(r)
 
 	// Get session from header or cookie
@@ -34,10 +46,10 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 	// Check if user session is valid
 	if err != nil {
-		return nil, false, errors.Wrap(err, "couldn't get user session")
+		return nil, errors.Wrap(err, "couldn't get user session")
 	}
 	if session.IsNew {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	// User is logged in
@@ -48,10 +60,10 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		if err != nil {
 			var reqErr *svc.RequestError
 			if !errors.As(err, &reqErr) {
-				return nil, false, errors.Wrap(err, "UserInfo request failed unexpectedly")
+				return nil, errors.Wrap(err, "UserInfo request failed unexpectedly")
 			}
 			if reqErr.Response.StatusCode != http.StatusUnauthorized {
-				return nil, false, errors.Wrapf(err, "UserInfo request with unexpected code '%d'", reqErr.Response.StatusCode)
+				return nil, errors.Wrapf(err, "UserInfo request with unexpected code '%d'", reqErr.Response.StatusCode)
 			}
 			// Access token has expired
 			logger.Info("UserInfo token has expired")
@@ -63,7 +75,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
 			}
-			return nil, false, nil
+			return nil, nil
 		}
 	}
 
@@ -75,11 +87,9 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		groups = []string{}
 	}
 
-	resp := &authenticator.Response{
-		User: &user.DefaultInfo{
-			Name:   session.Values[oidc.UserSessionUserID].(string),
-			Groups: groups,
-		},
+	resp := &User{
+		Name:   session.Values[oidc.UserSessionUserID].(string),
+		Groups: groups,
 	}
-	return resp, true, nil
+	return resp, nil
 }

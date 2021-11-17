@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/arrikto/oidc-authservice/authenticator"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/gorilla/handlers"
@@ -16,8 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/shared"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
-	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 func main() {
@@ -100,14 +99,20 @@ func main() {
 	}
 	defer oidcStateStore.Close()
 
-	// Get Kubernetes authenticator
-	restConfig, err := clientconfig.GetConfig()
-	if err != nil {
-		log.Fatalf("Error getting K8s config: %v", err)
+	enabledAuthenticators := map[string]bool{}
+	for _, authenticator := range c.Authenticators {
+		enabledAuthenticators[authenticator] = true
 	}
-	k8sAuthenticator, err := newKubernetesAuthenticator(restConfig, c.Audiences)
-	if err != nil {
-		log.Fatalf("Error creating K8s authenticator: %v", err)
+
+	authenticators := []authenticator.Authenticator{}
+
+	if enabledAuthenticators["kubernetes"] {
+		k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(c.Audiences)
+		if err != nil {
+			log.Fatalf("Error creating K8s authenticator: %v", err)
+		}
+
+		authenticators = append(authenticators, k8sAuthenticator)
 	}
 
 	tlsCfg := svc.TlsConfig(caBundle)
@@ -132,21 +137,27 @@ func main() {
 		c.SessionSameSite,
 	)
 
-	sessionAuthenticator := &sessionAuthenticator{
-		store:                   sessionStore,
-		strictSessionValidation: c.StrictSessionValidation,
-		tlsCfg:                  tlsCfg,
-		sm:                      sessionManager,
+	if enabledAuthenticators["session"] {
+		sessionAuthenticator := authenticator.NewSessionAuthenticator(
+			sessionStore,
+			c.StrictSessionValidation,
+			tlsCfg,
+			sessionManager,
+		)
+		authenticators = append(authenticators, sessionAuthenticator)
 	}
 
 	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
-	idTokenAuthenticator := &idTokenAuthenticator{
-		header:         c.IDTokenHeader,
-		userIDClaim:    c.UserIDClaim,
-		groupsClaim:    c.GroupsClaim,
-		sessionManager: sessionManager,
-		tlsCfg:         tlsCfg,
+	if enabledAuthenticators["idtoken"] {
+		idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
+			c.IDTokenHeader,
+			c.UserIDClaim,
+			c.GroupsClaim,
+			sessionManager,
+			tlsCfg,
+		)
+		authenticators = append(authenticators, idTokenAuthenticator)
 	}
 
 	// Set the server values.
@@ -165,14 +176,10 @@ func main() {
 			groupsHeader: c.GroupsHeader,
 		},
 		userIdTransformer: c.UserIDTransformer,
-		authenticators: []authenticator.Request{
-			sessionAuthenticator,
-			idTokenAuthenticator,
-			k8sAuthenticator,
-		},
-		authorizers:    []Authorizer{groupsAuthorizer},
-		tlsCfg:         tlsCfg,
-		sessionManager: sessionManager,
+		authenticators:    authenticators,
+		authorizers:       []Authorizer{groupsAuthorizer},
+		tlsCfg:            tlsCfg,
+		sessionManager:    sessionManager,
 	}
 
 	// Setup complete, mark server ready
