@@ -41,6 +41,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to parse configuration: %+v", err)
 	}
+
+	// set global log level
+	lvl, err := log.ParseLevel(c.LogLevel)
+	if err != nil {
+		log.Fatalf("Failed to parse LOG_LEVEL: %v", err)
+	}
+	log.SetLevel(lvl)
 	log.Infof("Config: %+v", c)
 
 	// Start readiness probe immediately

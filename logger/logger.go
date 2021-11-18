@@ -9,8 +9,10 @@ import (
 
 func ForRequest(r *http.Request) *log.Entry {
 	return log.WithContext(r.Context()).WithFields(log.Fields{
-		"ip":      getUserIP(r),
-		"request": r.URL.String(),
+		"ip":     getUserIP(r),
+		"host":   r.Host,
+		"path":   r.URL.String(),
+		"method": r.Method,
 	})
 }
 
