@@ -10,6 +10,7 @@ import (
 	"path"
 
 	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/authorizer"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
 	"github.com/gorilla/handlers"
@@ -18,6 +19,21 @@ import (
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/shared"
 )
+
+func newAuthorizer(c *config) authorizer.Authorizer {
+	if c.AuthzConfigPath != "" {
+		log.Infof("AuthzConfig file path=%s", c.AuthzConfigPath)
+		authz, err := authorizer.NewConfigAuthorizer(c.AuthzConfigPath)
+		if err != nil {
+			log.Fatalf("Error creating configAuthorizer: %v", err)
+		}
+
+		return authz
+	} else {
+		log.Info("no AuthzConfig file specified, using basic groups authorizer")
+		return authorizer.NewGroupsAuthorizer(c.GroupsAllowlist)
+	}
+}
 
 func main() {
 
@@ -147,8 +163,6 @@ func main() {
 		authenticators = append(authenticators, sessionAuthenticator)
 	}
 
-	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
-
 	if enabledAuthenticators["idtoken"] {
 		idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
 			c.IDTokenHeader,
@@ -177,7 +191,7 @@ func main() {
 		},
 		userIdTransformer: c.UserIDTransformer,
 		authenticators:    authenticators,
-		authorizers:       []Authorizer{groupsAuthorizer},
+		authorizers:       []authorizer.Authorizer{newAuthorizer(c)},
 		tlsCfg:            tlsCfg,
 		sessionManager:    sessionManager,
 	}

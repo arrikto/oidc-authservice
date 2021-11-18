@@ -1,4 +1,4 @@
-package main
+package authorizer
 
 import (
 	"fmt"
@@ -12,18 +12,11 @@ const (
 	wildcardMatcher = "*"
 )
 
-// Authorizer decides if a request, made by the given identity, is allowed.
-// The interface draws some inspiration from Kubernetes' interface:
-// https://github.com/kubernetes/apiserver/blob/master/pkg/authorization/authorizer/interfaces.go#L67-L72
-type Authorizer interface {
-	Authorize(r *http.Request, user *authenticator.User) (allowed bool, reason string, err error)
-}
-
 type groupsAuthorizer struct {
 	allowed map[string]bool
 }
 
-func newGroupsAuthorizer(allowlist []string) Authorizer {
+func NewGroupsAuthorizer(allowlist []string) Authorizer {
 	allowed := map[string]bool{}
 	for _, g := range allowlist {
 		if g == wildcardMatcher {
