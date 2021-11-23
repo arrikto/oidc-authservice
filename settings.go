@@ -33,10 +33,12 @@ type config struct {
 	Authenticators []string `split_words:"true" default:"session,idtoken,kubernetes" envconfig:"ENABLED_AUTHENTICATORS"`
 
 	// Identity Headers
-	UserIDHeader      string            `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
-	GroupsHeader      string            `split_words:"true" default:"kubeflow-groups"`
+	UserIDHeader      string            `split_words:"true" envconfig:"USERID_HEADER"`
+	GroupsHeader      string            `split_words:"true"`
 	UserIDPrefix      string            `split_words:"true" envconfig:"USERID_PREFIX"`
 	UserIDTransformer UserIDTransformer `envconfig:"USERID_TRANSFORMERS"`
+	TokenHeader       string            `split_words:"true" default:"Authorization"`
+	TokenScheme       string            `split_words:"true" default:"Bearer"`
 
 	// IDToken
 	UserIDClaim       string `split_words:"true" default:"email" envconfig:"USERID_CLAIM"`

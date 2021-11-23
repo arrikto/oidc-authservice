@@ -14,6 +14,12 @@ import (
 type sessionAuthenticator struct {
 	// store is the session store.
 	store oidc.SessionStore
+	// tokenHeader is the header that is set by the authenticator containing
+	// the user id token
+	tokenHeader string
+	// tokenScheme is the authorization scheme used for sending the user id token.
+	// e.g. Bearer, Basic
+	tokenScheme string
 	// strictSessionValidation mode checks the validity of the access token
 	// connected with the session on every request.
 	strictSessionValidation bool
@@ -26,12 +32,15 @@ type sessionAuthenticator struct {
 
 func NewSessionAuthenticator(
 	store oidc.SessionStore,
+	tokenHeader, tokenScheme string,
 	strictSessionValidation bool,
 	tlsCfg svc.TlsConfig,
 	sessionManager oidc.SessionManager) Authenticator {
 
 	return &sessionAuthenticator{
 		store:                   store,
+		tokenHeader:             tokenHeader,
+		tokenScheme:             tokenScheme,
 		strictSessionValidation: strictSessionValidation,
 		tlsCfg:                  tlsCfg,
 		sm:                      sessionManager,
@@ -86,6 +95,14 @@ func (sa *sessionAuthenticator) Authenticate(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		groups = []string{}
 	}
+
+	// set auth header with user token
+	idHeader := session.Values[oidc.UserSessionIDToken].(string)
+	// prepend authorization scheme if one is specified
+	if sa.tokenScheme != "" {
+		idHeader = sa.tokenScheme + " " + idHeader
+	}
+	w.Header().Set(sa.tokenHeader, idHeader)
 
 	resp := &User{
 		Name:   session.Values[oidc.UserSessionUserID].(string),

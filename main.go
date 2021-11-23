@@ -163,6 +163,8 @@ func main() {
 	if enabledAuthenticators["session"] {
 		sessionAuthenticator := authenticator.NewSessionAuthenticator(
 			sessionStore,
+			c.TokenHeader,
+			c.TokenScheme,
 			c.StrictSessionValidation,
 			tlsCfg,
 			sessionManager,
@@ -191,16 +193,18 @@ func main() {
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
-		upstreamHTTPHeaderOpts: httpHeaderOpts{
-			userIDHeader: c.UserIDHeader,
-			userIDPrefix: c.UserIDPrefix,
-			groupsHeader: c.GroupsHeader,
-		},
-		userIdTransformer: c.UserIDTransformer,
-		authenticators:    authenticators,
-		authorizers:       []authorizer.Authorizer{newAuthorizer(c)},
-		tlsCfg:            tlsCfg,
-		sessionManager:    sessionManager,
+		userHeaderHelper: newUserHeaderHelper(
+			httpHeaderOpts{
+				userIDHeader: c.UserIDHeader,
+				userIDPrefix: c.UserIDPrefix,
+				groupsHeader: c.GroupsHeader,
+			},
+			&c.UserIDTransformer,
+		),
+		authenticators: authenticators,
+		authorizers:    []authorizer.Authorizer{newAuthorizer(c)},
+		tlsCfg:         tlsCfg,
+		sessionManager: sessionManager,
 	}
 
 	// Setup complete, mark server ready
