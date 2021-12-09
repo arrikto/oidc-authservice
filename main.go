@@ -13,7 +13,6 @@ import (
 	"github.com/arrikto/oidc-authservice/authorizer"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/svc"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
@@ -74,7 +73,7 @@ func main() {
 	log.Infof("Starting server at %v:%v", c.Hostname, c.Port)
 	stopCh := make(chan struct{})
 	go func(stopCh chan struct{}) {
-		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), handlers.CORS()(router)))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), router))
 		close(stopCh)
 	}(stopCh)
 
@@ -154,6 +153,7 @@ func main() {
 		store,
 		c.AuthHeader,
 		oidc.UserSessionCookie,
+		c.SessionDomain,
 		c.UserIDClaim,
 		c.GroupsClaim,
 		c.SessionMaxAge,
@@ -188,8 +188,11 @@ func main() {
 
 	*s = server{
 		// TODO: Add support for Redis
-		sessionStore:           sessionStore,
-		oidcStateStore:         oidc.NewOidcStateStore(oidcStateStore),
+		sessionStore: sessionStore,
+		oidcStateStore: oidc.NewOidcStateStore(
+			oidcStateStore,
+			c.SessionDomain,
+		),
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
@@ -206,6 +209,14 @@ func main() {
 		tlsCfg:         tlsCfg,
 		sessionManager: sessionManager,
 	}
+
+	s.newState = oidc.NewStateFunc(
+		&oidc.Config{
+			SessionDomain: c.SessionDomain,
+			SchemeDefault: c.SchemeDefault,
+			SchemeHeader:  c.SchemeHeader,
+		},
+	)
 
 	// Setup complete, mark server ready
 	isReady.Set()

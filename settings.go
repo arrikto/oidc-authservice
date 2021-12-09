@@ -25,6 +25,8 @@ type config struct {
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`
 	SkipAuthURLs         []string `split_words:"true" envconfig:"SKIP_AUTH_URLS"`
 	AuthHeader           string   `split_words:"true" default:"Authorization"`
+	SchemeDefault        string   `split_words:"true" default:"https"`
+	SchemeHeader         string   `split_words:"true" default:"X-Forwarded-Proto"`
 	Audiences            []string `default:"istio-ingressgateway.istio-system.svc.cluster.local"`
 	HomepageURL          *url.URL `split_words:"true"`
 	AfterLoginURL        *url.URL `split_words:"true"`
@@ -55,6 +57,7 @@ type config struct {
 	SessionStorePath   string `split_words:"true" default:"/var/lib/authservice/data.db"`
 	SessionMaxAge      int    `split_words:"true" default:"86400"`
 	SessionSameSite    string `split_words:"true" default:"Lax"`
+	SessionDomain      string `split_words:"true"`
 
 	// Site
 	ClientName          string            `split_words:"true" default:"AuthService"`

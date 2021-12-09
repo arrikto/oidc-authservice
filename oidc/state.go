@@ -4,11 +4,13 @@ import (
 	"encoding/gob"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -26,8 +28,59 @@ func init() {
 	gob.Register(oidc.IDToken{})
 }
 
+type Config struct {
+	SchemeDefault string
+	SchemeHeader  string
+	SessionDomain string
+}
+
+type StateFunc func(*http.Request) *State
+
+func NewStateFunc(config *Config) StateFunc {
+	if len(config.SessionDomain) > 0 {
+		return newSchemeAndHost(config)
+	}
+	return relativeURL
+}
+
+func firstVisitedURL(u *url.URL) string {
+	firstVisited, err := url.Parse("")
+	if err != nil {
+		panic(err)
+	}
+	firstVisited.Path = u.Path
+	firstVisited.RawPath = u.RawPath
+	firstVisited.RawQuery = u.RawQuery
+
+	return firstVisited.String()
+}
+
+func relativeURL(r *http.Request) *State {
+	return &State{
+		FirstVisitedURL: firstVisitedURL(r.URL),
+	}
+}
+
+func newSchemeAndHost(config *Config) StateFunc {
+	return func(r *http.Request) *State {
+		// Use header value if it exists
+		s := r.Header.Get(config.SchemeHeader)
+		if s == "" {
+			s = config.SchemeDefault
+		}
+		// XXX Could return an error here. Would require changing the StateFunc type
+		if !strings.HasSuffix(r.Host, config.SessionDomain) {
+			log.Warnf("Request host %q is not a subdomain of %q", r.Host, config.SessionDomain)
+		}
+		return &State{
+			FirstVisitedURL: s + "://" + r.Host + firstVisitedURL(r.URL),
+		}
+	}
+}
+
 type OidcStateStore struct {
-	store sessions.Store
+	store           sessions.Store
+	sessionDomain   string
 }
 
 type State struct {
@@ -36,9 +89,12 @@ type State struct {
 	FirstVisitedURL string
 }
 
-func NewOidcStateStore(store sessions.Store) OidcStateStore {
+func NewOidcStateStore(
+	store sessions.Store,
+	sessionDomain string) OidcStateStore {
 	return OidcStateStore{
-		store: store,
+		store:           store,
+		sessionDomain:   sessionDomain,
 	}
 }
 
@@ -78,21 +134,13 @@ func (s *OidcStateStore) sessionFromStateCookie(r *http.Request) (*sessions.Sess
 	return session, nil
 }
 
-func (s *OidcStateStore) CreateState(r *http.Request, w http.ResponseWriter) error {
-	firstVisited, err := url.Parse("")
-	if err != nil {
-		return err
-	}
-	firstVisited.Path = r.URL.Path
-	firstVisited.RawPath = r.URL.RawPath
-	firstVisited.RawQuery = r.URL.RawQuery
-
-	state := &State{
-		FirstVisitedURL: firstVisited.String(),
-	}
+func (s *OidcStateStore) CreateState(
+	r *http.Request, w http.ResponseWriter, fn StateFunc) error {
+	state := fn(r)
 	session := sessions.NewSession(s.store, OidcStateCookie)
 	session.Options.MaxAge = int(20 * time.Minute)
 	session.Options.Path = "/"
+	session.Options.Domain = s.sessionDomain
 	session.Values[SessionValueState] = *state
 
 	return session.Save(r, w)
