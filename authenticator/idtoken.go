@@ -59,8 +59,8 @@ func (s *idTokenAuthenticator) Authenticate(w http.ResponseWriter, r *http.Reque
 	userID, err := claims.UserID()
 	if err != nil {
 		// No USERID_CLAIM, pass this authenticator
-		logger.Error("USERID_CLAIM doesn't exist in the id token")
-		return nil, nil
+		logger.Info("USERID_CLAIM doesn't exist in the id token")
+		return &User{}, nil
 	}
 
 	user := User{Name: userID, Groups: claims.Groups()}
