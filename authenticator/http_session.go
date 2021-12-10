@@ -49,6 +49,7 @@ func NewSessionAuthenticator(
 
 func (sa *sessionAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {
 	logger := logger.ForRequest(r)
+	logger.Info("Attempting HTTP session authentication")
 
 	// Get session from header or cookie
 	session, err := sa.store.SessionFromRequest(r)

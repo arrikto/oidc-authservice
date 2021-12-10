@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/logger"
 	"github.com/arrikto/oidc-authservice/svc"
 	kauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -37,6 +38,9 @@ func NewKubernetesAuthenticator(aud []string) (Authenticator, error) {
 }
 
 func (k8sauth *kubernetesAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {
+	logger := logger.ForRequest(r)
+	logger.Info("Attempting k8s authentication")
+
 	resp, found, err := k8sauth.authenticator.AuthenticateRequest(
 		r.WithContext(kauthenticator.WithAudiences(r.Context(), k8sauth.audiences)),
 	)

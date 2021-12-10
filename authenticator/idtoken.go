@@ -31,6 +31,7 @@ func NewIdTokenAuthenticator(
 
 func (s *idTokenAuthenticator) Authenticate(w http.ResponseWriter, r *http.Request) (*User, error) {
 	logger := logger.ForRequest(r)
+	logger.Infof("Attempting idtoken authentication using token header '%s'", s.header)
 
 	clientID := r.Header.Get("X-OIDC-Client-Id")
 
