@@ -58,7 +58,9 @@ func (s *idTokenAuthenticator) Authenticate(w http.ResponseWriter, r *http.Reque
 
 	userID, err := claims.UserID()
 	if err != nil {
-		// No USERID_CLAIM, pass this authenticator
+		// this token doesn't have a userid claim (or the associated groups)
+		// we return an empty user here because this is expected in the case
+		// of client credentials flows
 		logger.Info("USERID_CLAIM doesn't exist in the id token")
 		return &User{}, nil
 	}
