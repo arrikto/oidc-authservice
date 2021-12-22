@@ -38,7 +38,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	logger := loggerForRequest(r, "session authenticator")
 
 	// Get session from header or cookie
-	session, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
+	session, authMethod, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
 
 	// Check if user session is valid
 	if err != nil {
@@ -86,10 +86,13 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		groups = []string{}
 	}
 
+	extra := map[string][]string{"auth-method": {authMethod}}
+
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   session.Values[userSessionUserID].(string),
 			Groups: groups,
+			Extra:  extra,
 		},
 	}
 	return resp, true, nil

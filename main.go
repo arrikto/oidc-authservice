@@ -178,9 +178,10 @@ func main() {
 			groupsClaim: c.GroupsClaim,
 		},
 		upstreamHTTPHeaderOpts: httpHeaderOpts{
-			userIDHeader: c.UserIDHeader,
-			userIDPrefix: c.UserIDPrefix,
-			groupsHeader: c.GroupsHeader,
+			userIDHeader:     c.UserIDHeader,
+			userIDPrefix:     c.UserIDPrefix,
+			groupsHeader:     c.GroupsHeader,
+			authMethodHeader: c.AuthMethodHeader,
 		},
 		userIdTransformer:       c.UserIDTransformer,
 		sessionMaxAgeSeconds:    c.SessionMaxAge,

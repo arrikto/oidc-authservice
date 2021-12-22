@@ -25,6 +25,7 @@ type config struct {
 	AuthserviceURLPrefix *url.URL `required:"true" split_words:"true"`
 	SkipAuthURLs         []string `split_words:"true" envconfig:"SKIP_AUTH_URLS"`
 	AuthHeader           string   `split_words:"true" default:"Authorization"`
+	AuthMethodHeader     string   `split_words:"true" default:"Auth-Method"`
 	Audiences            []string `default:"istio-ingressgateway.istio-system.svc.cluster.local"`
 	HomepageURL          *url.URL `split_words:"true"`
 	AfterLoginURL        *url.URL `split_words:"true"`

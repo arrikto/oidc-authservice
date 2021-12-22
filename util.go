@@ -157,6 +157,11 @@ func userInfoToHeaders(info user.Info, opts *httpHeaderOpts, transformer *UserID
 	res := map[string]string{}
 	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(info.GetName())
 	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
+	if authMethodArr, ok := info.GetExtra()["auth-method"]; ok {
+		if len(authMethodArr) > 0 && authMethodArr[0] != "" {
+			res[opts.authMethodHeader] = authMethodArr[0]
+		}
+	}
 	return res
 }
 
