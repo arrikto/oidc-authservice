@@ -46,8 +46,9 @@ func sessionFromID(id string, store sessions.Store) (*sessions.Session, error) {
 // order. If it doesn't find a valid session in the header, it will then check
 // the cookie.
 func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
-	header string) (*sessions.Session, error) {
+	header string) (*sessions.Session, string, error) {
 
+	var authMethod string
 	logger := loggerForRequest(r, "session authenticator")
 	// Try to get session from header
 	sessionID := getBearerToken(r.Header.Get(header))
@@ -55,13 +56,19 @@ func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 		s, err := sessionFromID(sessionID, store)
 		if err == nil && !s.IsNew {
 			logger.Infof("Loading session from header %s", header)
-			return s, nil
+			// Authentication using header successfully completed
+			authMethod = "header"
+			return s, authMethod, nil
 		}
 		logger.Infof("Header %s didn't contain a valid session id: %v", header, err)
 	}
 	// Header failed, try to get session from cookie
 	logger.Infof("Loading session from cookie %s", cookie)
-	return store.Get(r, cookie)
+	s, err := store.Get(r, cookie)
+	if err == nil && !s.IsNew {
+		authMethod = "cookie"
+	}
+	return s, authMethod, err
 }
 
 // revokeSession revokes the given session.

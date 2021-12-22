@@ -6,6 +6,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -38,5 +39,21 @@ func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*a
 	if err != nil && strings.Contains(err.Error(), bearerTokenExpiredMsg) {
 		return nil, false, &loginExpiredError{Err: err}
 	}
+
+	if found {
+		// Authentication using header successfully completed
+		extra := map[string][]string{"auth-method": {"header"}}
+
+		resp = &authenticator.Response{
+			Audiences: resp.Audiences,
+			User: &user.DefaultInfo{
+				Name:   resp.User.GetName(),
+				UID:    resp.User.GetUID(),
+				Groups: resp.User.GetGroups(),
+				Extra:  extra,
+			},
+		}
+	}
+
 	return resp, found, err
 }

@@ -65,12 +65,13 @@ type jwtClaimOpts struct {
 	groupsClaim string
 }
 
-// httpHeaderOpts specifies the location of the user's identity inside HTTP
-// headers.
+// httpHeaderOpts specifies the location of the user's identity and
+// authentication method inside HTTP headers.
 type httpHeaderOpts struct {
-	userIDHeader string
-	userIDPrefix string
-	groupsHeader string
+	userIDHeader     string
+	userIDPrefix     string
+	groupsHeader     string
+	authMethodHeader string
 }
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +122,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		// the session authenticator.
 		if !allowed {
 			logger.Infof("Authorizer '%d' denied the request with reason: '%s'", i, reason)
-			session, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
+			session, _, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
 			if err != nil {
 				logger.Errorf("Error getting session for request: %v", err)
 			}

@@ -55,10 +55,14 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
+	// Authentication using header successfully completed
+	extra := map[string][]string{"auth-method": {"header"}}
+
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   claims[s.userIDClaim].(string),
 			Groups: groups,
+			Extra:  extra,
 		},
 	}
 	return resp, true, nil
