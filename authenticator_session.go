@@ -35,7 +35,7 @@ type sessionAuthenticator struct {
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, "session authenticator")
 
 	// Get session from header or cookie
 	session, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
@@ -45,6 +45,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		return nil, false, errors.Wrap(err, "couldn't get user session")
 	}
 	if session.IsNew {
+		logger.Info("Failed to retrieve a valid session")
 		return nil, false, nil
 	}
 

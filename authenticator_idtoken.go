@@ -18,11 +18,12 @@ type idTokenAuthenticator struct {
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, "idtoken authenticator")
 
 	// get id-token from header
 	bearer := getBearerToken(r.Header.Get(s.header))
 	if len(bearer) == 0 {
+		logger.Info("No bearer token found")
 		return nil, false, nil
 	}
 

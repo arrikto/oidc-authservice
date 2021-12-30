@@ -32,8 +32,9 @@ func realpath(path string) (string, error) {
 	return path, nil
 }
 
-func loggerForRequest(r *http.Request) *log.Entry {
+func loggerForRequest(r *http.Request, info string) *log.Entry {
 	return log.WithContext(r.Context()).WithFields(log.Fields{
+		"context": info, // include info about the module generating the log
 		"ip":      getUserIP(r),
 		"request": r.URL.String(),
 	})

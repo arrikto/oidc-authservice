@@ -17,9 +17,18 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+const (
+	logModuleInfo = "server"
+)
+
 var (
-	OIDCCallbackPath  = "/oidc/callback"
-	SessionLogoutPath = "/logout"
+	OIDCCallbackPath      = "/oidc/callback"
+	SessionLogoutPath     = "/logout"
+	authenticatorsMapping = []string{
+		0: "session authenticator",
+		1: "idtoken authenticator",
+		2: "kubernetes authenticator",
+	}
 )
 
 func init() {
@@ -66,14 +75,15 @@ type httpHeaderOpts struct {
 
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, logModuleInfo)
 	logger.Info("Authenticating request...")
 
 	var userInfo user.Info
 	for i, auth := range s.authenticators {
+		logger.Infof("%s starting...", strings.Title(authenticatorsMapping[i]))
 		resp, found, err := auth.AuthenticateRequest(r)
 		if err != nil {
-			logger.Errorf("Error authenticating request using authenticator %d: %v", i, err)
+			logger.Errorf("Error authenticating request using %s: %v", authenticatorsMapping[i], err)
 			// If we get a login expired error, it means the authenticator
 			// recognised a valid authentication method which has expired
 			var expiredErr *loginExpiredError
@@ -83,6 +93,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if found {
+			logger.Infof("Successfully authenticated request using %s", authenticatorsMapping[i])
 			userInfo = resp.User
 			logger.Infof("UserInfo: %+v", userInfo)
 			break
@@ -139,7 +150,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
 func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *http.Request) {
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, logModuleInfo)
 
 	// Initiate OIDC Flow with Authorization Request.
 	state, err := createState(r, w, s.oidcStateStore)
@@ -155,7 +166,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
 func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, logModuleInfo)
 
 	// Get authorization code from authorization response.
 	var authCode = r.FormValue("code")
@@ -276,7 +287,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 // logout is the handler responsible for revoking the user's session.
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, logModuleInfo)
 
 	// Only header auth allowed for this endpoint
 	sessionID := getBearerToken(r.Header.Get(s.authHeader))
@@ -350,7 +361,7 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := loggerForRequest(r)
+			logger := loggerForRequest(r, logModuleInfo)
 			// Check whitelist
 			for _, prefix := range whitelist {
 				if strings.HasPrefix(r.URL.Path, prefix) {
