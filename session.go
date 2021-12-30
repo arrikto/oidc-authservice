@@ -48,7 +48,7 @@ func sessionFromID(id string, store sessions.Store) (*sessions.Session, error) {
 func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	header string) (*sessions.Session, error) {
 
-	logger := loggerForRequest(r)
+	logger := loggerForRequest(r, "session authenticator")
 	// Try to get session from header
 	sessionID := getBearerToken(r.Header.Get(header))
 	if sessionID != "" {
@@ -57,7 +57,7 @@ func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 			logger.Infof("Loading session from header %s", header)
 			return s, nil
 		}
-		logger.Debugf("Header %s didn't contain a valid session id: %v", header, err)
+		logger.Infof("Header %s didn't contain a valid session id: %v", header, err)
 	}
 	// Header failed, try to get session from cookie
 	logger.Infof("Loading session from cookie %s", cookie)
