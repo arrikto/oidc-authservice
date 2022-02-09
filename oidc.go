@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
@@ -77,10 +78,41 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 		}
 	}
 
-	var userInfo UserInfo
-	if err := json.Unmarshal(body, &userInfo); err != nil {
-		return nil, errors.Errorf("oidc: failed to decode userinfo: %v", err)
+        raw := struct {
+		Subject       string      `json:"sub"`
+		Profile       string      `json:"profile"`
+		Email         string      `json:"email"`
+		EmailVerified interface{} `json:"email_verified"`
+
+		RawClaims []byte
+        }{}
+
+        err = json.Unmarshal(body,&raw)
+        if err != nil {
+                return nil, errors.Errorf("oidc: fail to decode userinfo: %v", err)
+        }
+
+        userInfo := &UserInfo{
+		Subject: raw.Subject,
+		Profile: raw.Profile,
+		Email: raw.Email,
 	}
+
+	switch ParsedEmailVerified := raw.EmailVerified.(type) {
+	case bool:
+		userInfo.EmailVerified = ParsedEmailVerified
+	case nil:
+		userInfo.EmailVerified = false
+	case string:
+		boolValue, err := strconv.ParseBool(ParsedEmailVerified)
+		if err != nil {
+			return nil, errors.Errorf("oidc: failed to decode the email_verified field of userinfo: %v", err)
+		}
+		userInfo.EmailVerified = boolValue
+	default:
+		return nil, errors.Errorf("oidc: unsupported type for the email_verified field")
+	}
+
 	userInfo.RawClaims = body
-	return &userInfo, nil
+	return userInfo, nil
 }
