@@ -30,6 +30,48 @@ func (u *UserInfo) Claims(v interface{}) error {
 	return json.Unmarshal(u.RawClaims, v)
 }
 
+// ParseUserInfo unmarshals the response of the UserInfo endpoint
+// and enforces boolean value for the EmailVerified claim.
+func ParseUserInfo(body []byte) (*UserInfo, error){
+
+	raw := struct {
+		Subject       string      `json:"sub"`
+		Profile       string      `json:"profile"`
+		Email         string      `json:"email"`
+		EmailVerified interface{} `json:"email_verified"`
+		RawClaims     []byte
+	}{}
+
+	err := json.Unmarshal(body, &raw)
+	if err != nil {
+		return nil, errors.Errorf("oidc: fail to decode userinfo: %v", err)
+	}
+
+	userInfo := &UserInfo{
+		Subject: raw.Subject,
+		Profile: raw.Profile,
+		Email:   raw.Email,
+	}
+
+	switch ParsedEmailVerified := raw.EmailVerified.(type) {
+	case bool:
+		userInfo.EmailVerified = ParsedEmailVerified
+	case string:
+		boolValue, err := strconv.ParseBool(ParsedEmailVerified)
+		if err != nil {
+			return nil, errors.Errorf("oidc: failed to decode the email_verified field of userinfo: %v", err)
+		}
+		userInfo.EmailVerified = boolValue
+	case nil:
+		userInfo.EmailVerified = false
+	default:
+		return nil, errors.Errorf("oidc: unsupported type for the email_verified field")
+	}
+	userInfo.RawClaims = body
+
+	return userInfo, nil
+}
+
 // GetUserInfo uses the token source to query the provider's user info endpoint.
 // We reimplement UserInfo [1] instead of using the go-oidc's library UserInfo, in
 // order to include HTTP response information in case of an error during
@@ -78,41 +120,10 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 		}
 	}
 
-        raw := struct {
-		Subject       string      `json:"sub"`
-		Profile       string      `json:"profile"`
-		Email         string      `json:"email"`
-		EmailVerified interface{} `json:"email_verified"`
-
-		RawClaims []byte
-        }{}
-
-        err = json.Unmarshal(body,&raw)
-        if err != nil {
-                return nil, errors.Errorf("oidc: fail to decode userinfo: %v", err)
-        }
-
-        userInfo := &UserInfo{
-		Subject: raw.Subject,
-		Profile: raw.Profile,
-		Email: raw.Email,
+	userInfo, err := ParseUserInfo(body)
+	if err != nil {
+		return nil, errors.Errorf("oidc: failed to parse userInfo body: %v", err)
 	}
 
-	switch ParsedEmailVerified := raw.EmailVerified.(type) {
-	case bool:
-		userInfo.EmailVerified = ParsedEmailVerified
-	case nil:
-		userInfo.EmailVerified = false
-	case string:
-		boolValue, err := strconv.ParseBool(ParsedEmailVerified)
-		if err != nil {
-			return nil, errors.Errorf("oidc: failed to decode the email_verified field of userinfo: %v", err)
-		}
-		userInfo.EmailVerified = boolValue
-	default:
-		return nil, errors.Errorf("oidc: unsupported type for the email_verified field")
-	}
-
-	userInfo.RawClaims = body
 	return userInfo, nil
 }
