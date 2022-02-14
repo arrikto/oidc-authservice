@@ -127,3 +127,63 @@ func TestGetUserInfo_ContextCancelled(t *testing.T) {
 			reqErr.Response.StatusCode, http.StatusUnauthorized)
 	}
 }
+
+func TestParseUserInfo(t *testing.T){
+
+	testCases := []struct{
+		testName 		 string
+		userInfoResponse string
+		success			 bool
+	}{
+		{
+			testName: "EmailVerified: true (boolean)",
+			userInfoResponse: `{"sub": "", "profile": "", "email": "", "email_verified": true}`,
+			success: true,
+		},
+		{
+			testName: "EmailVerified: false (boolean)",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": false}`,
+			success: true,
+		},
+		{
+			testName: "EmailVerified: true (string)",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": "true"}`,
+			success: true,
+		},
+		{
+			testName: "EmailVerified: false (string)",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": "false"}`,
+			success: true,
+		},
+		{
+			testName: "EmailVerified: nil",
+			userInfoResponse: `{"sub": "","profile": "","email": ""}`,
+			success: true,
+		},
+		{
+			testName: "EmailVerified: not boolean, not string, not nil",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": 42}`,
+			success: false,
+		},
+		{
+			testName: "EmailVerified: irrelevant string",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": "fals"}`,
+			success: false,
+		},
+	}
+
+	for _, c := range testCases {
+		t.Run(c.testName, func(t *testing.T) {
+			_, err:= ParseUserInfo([]byte(c.userInfoResponse))
+
+			success := true
+			if err != nil {
+				success = false
+			}
+
+			if success != c.success {
+				t.Errorf("ParseUserInfo result for %v is not the expected one.", c)
+			}
+		})
+	}
+}
