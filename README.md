@@ -121,6 +121,14 @@ Applications can then use those headers to identify the user.
 | `GROUPS_HEADER` | "kubeflow-groups" | Name of the header containing the groups that will be added to the upstream request. |
 | `AUTH_METHOD_HEADER` | "Auth-Method" | Name of the header that is included in the proxied requests to inform the upstream app about the authentication method used (`cookie` / `header`). |
 
+OIDC AuthService can authenticate clients based on the bearer token found in the Authorization header of their request. It caches the bearer token and the respective user information. If the incoming request has a cached bearer token then AuthService authenticates this client and proceeds with the basic authorization checks. The following
+settings are related to the caching mechanism:
+
+| Setting | Default | Description |
+| - | - | - |
+| `CACHE_ENABLED` | `false` | Set `CACHE_ENABLED` to `true` to enable caching. |
+| `CACHE_EXPIRATION_MINUTES` | `5` (minutes) | Set the `CACHE_EXPIRATION_MINUTES` value to define how many minutes it takes for every cache entry to expire. |
+
 OIDC AuthService can also perform basic authorization checks. The following
 settings are related to authorization:
 
