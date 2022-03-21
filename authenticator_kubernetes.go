@@ -57,3 +57,10 @@ func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*a
 
 	return resp, found, err
 }
+
+// The Kubernetes Authenticator implements the Cacheable
+// interface with the getCacheKey().
+func (k8sauth *kubernetesAuthenticator) getCacheKey(r *http.Request) (string) {
+	return getBearerToken(r.Header.Get("Authorization"))
+
+}

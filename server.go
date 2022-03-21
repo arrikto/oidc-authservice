@@ -6,10 +6,13 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
+	"time"
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
+	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
@@ -43,6 +46,7 @@ type server struct {
 	oauth2Config            *oauth2.Config
 	store                   sessions.Store
 	oidcStateStore          sessions.Store
+	bearerUserInfoCache     *cache.Cache
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
 	afterLoginRedirectURL   string
@@ -50,6 +54,10 @@ type server struct {
 	afterLogoutRedirectURL  string
 	sessionMaxAgeSeconds    int
 	strictSessionValidation bool
+
+	cacheEnabled            bool
+	cacheExpirationMinutes  int
+
 	authHeader              string
 	idTokenOpts             jwtClaimOpts
 	upstreamHTTPHeaderOpts  httpHeaderOpts
@@ -80,7 +88,35 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	logger.Info("Authenticating request...")
 
 	var userInfo user.Info
+
 	for i, auth := range s.authenticators {
+		var cacheKey string
+
+		if s.cacheEnabled {
+			// If the cache is enabled, check if the current authenticator implements the Cacheable interface.
+			cacheable := reflect.TypeOf((*Cacheable)(nil)).Elem()
+			isCacheable := reflect.TypeOf(auth).Implements(cacheable)
+
+			if isCacheable {
+				// Store the key that we are going to use for caching UserDetails.
+				// We store it before the authentication, because the authenticators may mutate the request object.
+				logger.Debugf("Retrieving the cache key...")
+				cacheableAuthenticator := reflect.ValueOf(auth).Interface().(Cacheable)
+				cacheKey = cacheableAuthenticator.getCacheKey(r)
+			}
+		}
+
+		if cacheKey != "" {
+			// If caching is enabled, try to retrieve the UserInfo from cache.
+			userInfo = s.getCachedUserInfo(cacheKey, r)
+
+			if userInfo != nil {
+				logger.Infof("Successfully authenticated request using the cache.")
+				logger.Infof("UserInfo: %+v", userInfo)
+				break
+			}
+		}
+
 		logger.Infof("%s starting...", strings.Title(authenticatorsMapping[i]))
 		resp, found, err := auth.AuthenticateRequest(r)
 		if err != nil {
@@ -97,6 +133,12 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			logger.Infof("Successfully authenticated request using %s", authenticatorsMapping[i])
 			userInfo = resp.User
 			logger.Infof("UserInfo: %+v", userInfo)
+
+			if cacheKey != "" {
+				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
+				logger.Infof("Caching authenticated UserInfo...")
+				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)
+			}
 			break
 		}
 	}
@@ -147,6 +189,21 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	return
+}
+
+// getCachedUserInfo returns the UserInfo if it's in the cache
+// using the key: 'cacheKey' or it returns nil.
+func (s *server) getCachedUserInfo(cacheKey string, r *http.Request) user.Info {
+	logger := loggerForRequest(r, logModuleInfo)
+
+	cachedUserInfo, found := s.bearerUserInfoCache.Get(cacheKey)
+	if found {
+		userInfo := cachedUserInfo.(user.Info)
+		logger.Infof("Found Cached UserInfo: %+v", userInfo)
+		return userInfo
+	}
+	logger.Info("The UserInfo is not cached.")
+	return nil
 }
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow

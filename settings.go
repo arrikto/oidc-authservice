@@ -60,6 +60,10 @@ type config struct {
 	TemplatePath        []string          `split_words:"true"`
 	UserTemplateContext map[string]string `ignored:"true"`
 
+	// bearerUserInfoCache configuration
+	CacheEnabled           bool  `split_words:"true" default:"false" envconfig:"CACHE_ENABLED"`
+	CacheExpirationMinutes int   `split_words:"true" default:"5" envconfig:"CACHE_EXPIRATION_MINUTES"`
+
 	// Authorization
 	GroupsAllowlist []string `split_words:"true" default:"*"`
 }

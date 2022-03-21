@@ -20,6 +20,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+type Cacheable interface {
+	getCacheKey(r *http.Request) string
+}
+
 func realpath(path string) (string, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {

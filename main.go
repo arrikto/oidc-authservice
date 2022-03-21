@@ -13,6 +13,7 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"github.com/yosssi/boltstore/shared"
@@ -23,6 +24,7 @@ import (
 
 // Issue: https://github.com/gorilla/sessions/issues/200
 const secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
+const CacheCleanupInterval = 10
 
 func main() {
 
@@ -161,6 +163,10 @@ func main() {
 		groupsClaim: c.GroupsClaim,
 	}
 
+	// Set the bearerUserInfoCache cache to store
+	// the (Bearer Token, UserInfo) pairs.
+	bearerUserInfoCache := cache.New(time.Duration(c.CacheExpirationMinutes)*time.Minute, time.Duration(CacheCleanupInterval)*time.Minute)
+
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
 
@@ -170,6 +176,7 @@ func main() {
 		// TODO: Add support for Redis
 		store:                  store,
 		oidcStateStore:         oidcStateStore,
+		bearerUserInfoCache:    bearerUserInfoCache,
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
@@ -186,6 +193,8 @@ func main() {
 		userIdTransformer:       c.UserIDTransformer,
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
 		strictSessionValidation: c.StrictSessionValidation,
+		cacheEnabled:            c.CacheEnabled,
+		cacheExpirationMinutes:  c.CacheExpirationMinutes,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{
@@ -204,6 +213,9 @@ func main() {
 		// Use Lax mode as the default
 		s.sessionSameSite = http.SameSiteLaxMode
 	}
+
+	// Print server configuration info
+	log.Infof("Cache enabled: %t", s.cacheEnabled)
 
 	// Setup complete, mark server ready
 	isReady.Set()
