@@ -61,8 +61,13 @@ type config struct {
 	UserTemplateContext map[string]string `ignored:"true"`
 
 	// bearerUserInfoCache configuration
-	CacheEnabled           bool  `split_words:"true" default:"false" envconfig:"CACHE_ENABLED"`
-	CacheExpirationMinutes int   `split_words:"true" default:"5" envconfig:"CACHE_EXPIRATION_MINUTES"`
+	CacheEnabled           bool `split_words:"true" default:"false" envconfig:"CACHE_ENABLED"`
+	CacheExpirationMinutes int  `split_words:"true" default:"5" envconfig:"CACHE_EXPIRATION_MINUTES"`
+
+	// Authenticators configurations
+	IDTokenAuthnEnabled    bool `split_words:"true" default:"true" envconfig:"IDTOKEN_AUTHN_ENABLED"`
+	JWTAuthnEnabled        bool `split_words:"true" default:"true" envconfig:"JWT_AUTHN_ENABLED"`
+	KubernetesAuthnEnabled bool `split_words:"true" default:"true" envconfig:"KUBERNETES_AUTHN_ENABLED"`
 
 	// Authorization
 	GroupsAllowlist []string `split_words:"true" default:"*"`

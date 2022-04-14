@@ -56,8 +56,14 @@ type server struct {
 	sessionMaxAgeSeconds    int
 	strictSessionValidation bool
 
+	// Cache Configurations
 	cacheEnabled            bool
 	cacheExpirationMinutes  int
+
+	// Authenticators Configurations
+	IDTokenAuthnEnabled    bool
+	JWTAuthnEnabled        bool
+	KubernetesAuthnEnabled bool
 
 	authHeader              string
 	idTokenOpts             jwtClaimOpts
@@ -90,6 +96,10 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 	var userInfo user.Info
 	for i, auth := range s.authenticators {
+		if !s.enabledAuthenticator(authenticatorsMapping[i]){
+			continue
+		}
+
 		var cacheKey string
 
 		if s.cacheEnabled {
@@ -349,6 +359,23 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	logger.WithField("redirectTo", destination).
 		Info("Login validated with ID token, redirecting.")
 	http.Redirect(w, r, destination, http.StatusFound)
+}
+
+// enabledAuthenticator indicates if the examined authenticator is enabled.
+func (s *server) enabledAuthenticator(authenticator string) (bool){
+	if authenticator == "session authenticator" {
+		return true
+	}
+	if authenticator == "idtoken authenticator" && s.IDTokenAuthnEnabled {
+		return true
+	}
+	if authenticator == "JWT access token authenticator" && s.JWTAuthnEnabled {
+		return true
+	}
+	if authenticator == "kubernetes authenticator" && s.KubernetesAuthnEnabled {
+		return true
+	}
+	return false
 }
 
 // logout is the handler responsible for revoking the user's session.

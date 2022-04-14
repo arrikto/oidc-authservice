@@ -129,6 +129,13 @@ settings are related to the caching mechanism:
 | `CACHE_ENABLED` | `false` | Set `CACHE_ENABLED` to `true` to enable caching. |
 | `CACHE_EXPIRATION_MINUTES` | `5` (minutes) | Set the `CACHE_EXPIRATION_MINUTES` value to define how many minutes it takes for every cache entry to expire. |
 
+By default, OIDC AuthService attempts to authenticate client requests with each one of the available authentication methods that it supports. In certain use cases the admins may want to skip the checks performed by one or more  of the authentication methods. OIDC AuthService can be configured to skip a particular authentication method via the following configurations:
+| Setting | Default | Description |
+| - | - | - |
+| `IDTOKEN_AUTHN_ENABLED` | `true` | Set `IDTOKEN_AUTHN_ENABLED` to `false` to disable the ID token authentication method. |
+| `JWT_AUTHN_ENABLED` | `true` | Set `JWT_AUTHN_ENABLED` to `false` to disable the JWT access token authentication method. |
+| `KUBERNETES_AUTHN_ENABLED` | `true` | Set `Kubernetes_AUTHN_ENABLED` to `false` to disable the Kubernetes authentication method. |
+
 OIDC AuthService can also perform basic authorization checks. The following
 settings are related to authorization:
 

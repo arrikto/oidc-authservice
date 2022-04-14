@@ -205,6 +205,9 @@ func main() {
 		strictSessionValidation: c.StrictSessionValidation,
 		cacheEnabled:            c.CacheEnabled,
 		cacheExpirationMinutes:  c.CacheExpirationMinutes,
+		IDTokenAuthnEnabled:     c.IDTokenAuthnEnabled,
+		JWTAuthnEnabled:         c.JWTAuthnEnabled,
+		KubernetesAuthnEnabled:  c.KubernetesAuthnEnabled,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{
