@@ -163,6 +163,16 @@ func main() {
 		groupsClaim: c.GroupsClaim,
 	}
 
+	jwtTokenAuthenticator := &jwtTokenAuthenticator{
+		header:      c.IDTokenHeader,
+		caBundle:    caBundle,
+		provider:    provider,
+		audiences:   c.Audiences,
+		issuer:	     c.ProviderURL.String(),
+		userIDClaim: c.UserIDClaim,
+		groupsClaim: c.GroupsClaim,
+	}
+
 	// Set the bearerUserInfoCache cache to store
 	// the (Bearer Token, UserInfo) pairs.
 	bearerUserInfoCache := cache.New(time.Duration(c.CacheExpirationMinutes)*time.Minute, time.Duration(CacheCleanupInterval)*time.Minute)
@@ -200,6 +210,7 @@ func main() {
 		authenticators: []authenticator.Request{
 			sessionAuthenticator,
 			idTokenAuthenticator,
+			jwtTokenAuthenticator,
 			k8sAuthenticator,
 		},
 		authorizers: []Authorizer{groupsAuthorizer},

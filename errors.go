@@ -37,3 +37,19 @@ func (e *loginExpiredError) Error() string {
 func (e *loginExpiredError) Unwrap() error {
 	return e.Err
 }
+
+// The authenticatorSpecificError type is used to inform the calling code
+// that the appropriate authentication method failed to authenticate the 
+// request. 
+// No other authentication method needs to be tested.
+type authenticatorSpecificError struct {
+	Err error
+}
+
+func (e *authenticatorSpecificError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *authenticatorSpecificError) Unwrap() error {
+	return e.Err
+}

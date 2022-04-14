@@ -30,7 +30,8 @@ var (
 	authenticatorsMapping = []string{
 		0: "session authenticator",
 		1: "idtoken authenticator",
-		2: "kubernetes authenticator",
+		2: "JWT access token authenticator",
+		3: "kubernetes authenticator",
 	}
 )
 
@@ -88,7 +89,6 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	logger.Info("Authenticating request...")
 
 	var userInfo user.Info
-
 	for i, auth := range s.authenticators {
 		var cacheKey string
 
@@ -128,6 +128,15 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
 				return
 			}
+
+			// If AuthService encountered an authenticator-specific error,
+// then no other authentication methods will be tested.
+			var authnError *authenticatorSpecificError
+			if errors.As(err, &authnError) {
+				returnMessage(w, http.StatusUnauthorized, authnError.Error())
+				return
+			}
+
 		}
 		if found {
 			logger.Infof("Successfully authenticated request using %s", authenticatorsMapping[i])

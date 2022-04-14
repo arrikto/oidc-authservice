@@ -9,6 +9,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -179,4 +181,55 @@ func interfaceSliceToStringSlice(in []interface{}) []string {
 		res = append(res, elem.(string))
 	}
 	return res
+}
+
+// The `aud` claim of a JWT token can be one of the following types:
+// * string
+// * []string
+// Similarly to the https://github.com/coreos/go-oidc/blob/v3/oidc/oidc.go
+// we introduce a custom UnmarshalJSON function that allows us to
+// handle both types.
+type audience []string
+
+func (a *audience) UnmarshalJSON(b []byte) error {
+	var s string
+	if json.Unmarshal(b, &s) == nil {
+		*a = audience{s}
+		return nil
+	}
+	var auds []string
+	if err := json.Unmarshal(b, &auds); err != nil {
+		return err
+	}
+	*a = auds
+	return nil
+}
+
+// We copy the parseJWT() from: https://github.com/coreos/go-oidc/blob/v3/oidc/verify.go
+// to perform one of the necessary local tests for the JWT authenticator.
+func parseJWT(p string) ([]byte, error) {
+	parts := strings.Split(p, ".")
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("malformed jwt, expected 3 parts got %d", len(parts))
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("malformed jwt payload: %v", err)
+	}
+	return payload, nil
+}
+
+// This function examines if there is at least one common element between
+// two []string objects. The JWT authenticator uses this function to verify
+// that at least one of the audiences of the examined JWT tokens exists in
+// the list of the audiences that the AuthService accepts.
+func contains(sli []string, ele []string) bool {
+	for _, s := range sli {
+		for _, elem := range ele {
+			if s == elem {
+				return true
+			}
+		}
+	}
+	return false
 }
