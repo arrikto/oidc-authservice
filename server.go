@@ -62,9 +62,10 @@ type server struct {
 	cacheExpirationMinutes  int
 
 	// Authenticators Configurations
-	IDTokenAuthnEnabled    bool
-	JWTAuthnEnabled        bool
-	KubernetesAuthnEnabled bool
+	IDTokenAuthnEnabled     bool
+	KubernetesAuthnEnabled  bool
+	AccessTokenAuthnEnabled bool
+	AccessTokenAuthn        string
 
 	authHeader              string
 	idTokenOpts             jwtClaimOpts
@@ -364,16 +365,21 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 // enabledAuthenticator indicates if the examined authenticator is enabled.
 func (s *server) enabledAuthenticator(authenticator string) (bool){
+	if authenticator == "kubernetes authenticator" && s.KubernetesAuthnEnabled {
+		return true
+	}
+	if s.AccessTokenAuthnEnabled {
+		if authenticator == "opaque access token authenticator" && s.AccessTokenAuthn == "opaque" {
+			return true
+		}
+		if authenticator == "JWT access token authenticator" && s.AccessTokenAuthn == "jwt" {
+			return true
+		}
+	}
 	if authenticator == "session authenticator" {
 		return true
 	}
 	if authenticator == "idtoken authenticator" && s.IDTokenAuthnEnabled {
-		return true
-	}
-	if authenticator == "JWT access token authenticator" && s.JWTAuthnEnabled {
-		return true
-	}
-	if authenticator == "kubernetes authenticator" && s.KubernetesAuthnEnabled {
 		return true
 	}
 	return false

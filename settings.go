@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
+	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -65,9 +66,10 @@ type config struct {
 	CacheExpirationMinutes int  `split_words:"true" default:"5" envconfig:"CACHE_EXPIRATION_MINUTES"`
 
 	// Authenticators configurations
-	IDTokenAuthnEnabled    bool `split_words:"true" default:"true" envconfig:"IDTOKEN_AUTHN_ENABLED"`
-	JWTAuthnEnabled        bool `split_words:"true" default:"true" envconfig:"JWT_AUTHN_ENABLED"`
-	KubernetesAuthnEnabled bool `split_words:"true" default:"true" envconfig:"KUBERNETES_AUTHN_ENABLED"`
+	IDTokenAuthnEnabled     bool   `split_words:"true" default:"true" envconfig:"IDTOKEN_AUTHN_ENABLED"`
+	KubernetesAuthnEnabled  bool   `split_words:"true" default:"true" envconfig:"KUBERNETES_AUTHN_ENABLED"`
+	AccessTokenAuthnEnabled bool   `split_words:"true" default:"true" envconfig:"ACCESS_TOKEN_AUTHN_ENABLED"`
+	AccessTokenAuthn        string `split_words:"true" default:"jwt" envconfig:"ACCESS_TOKEN_AUTHN"`
 
 	// Authorization
 	GroupsAllowlist []string `split_words:"true" default:"*"`
@@ -90,7 +92,10 @@ func parseConfig() (*config, error) {
 	if len(c.AfterLogoutURL.String()) == 0 {
 		c.AfterLogoutURL = resolvePathReference(c.AuthserviceURLPrefix, AfterLogoutPath)
 	}
-
+	if !validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn){
+		log.Fatalf("Unsupported access token authentication configuration:" +
+			"ACCESS_TOKEN_AUTHN=%s",c.AccessTokenAuthn)
+	}
 	c.UserTemplateContext = getEnvsFromPrefix("TEMPLATE_CONTEXT_")
 
 	c.SkipAuthURLs = trimSpaceFromStringSliceElements(c.SkipAuthURLs)
@@ -136,4 +141,24 @@ func ensureInSlice(elem string, slice []string) []string {
 	}
 	slice = append([]string{elem}, slice...)
 	return slice
+}
+
+// validAccessTokenAuthn() examines if the admins have configured
+// a valid value for the ACCESS_TOKEN_AUTHN envvar.
+func validAccessTokenAuthn(AccessTokenAuthnEnabledEnv bool, AccessTokenAuthnEnv string) (bool){
+	if !AccessTokenAuthnEnabledEnv {
+		return true
+	}
+	if AccessTokenAuthnEnv == "jwt" {
+		return true
+	}
+	if AccessTokenAuthnEnv == "opaque"{
+		return true
+	}
+
+	log.Info("Please select exactly one of the supported options: " +
+	"i) jwt: to enable the JWT access token authentication method, " +
+	"ii) opaque: to enable the opaque access token authentication method")
+
+	return false
 }
