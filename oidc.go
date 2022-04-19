@@ -98,6 +98,7 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 	}
 
 	token, err := tokenSource.Token()
+
 	if err != nil {
 		return nil, errors.Errorf("oidc: get access token: %v", err)
 	}
@@ -113,6 +114,7 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
+
 		return nil, &requestError{
 			Response: resp,
 			Body:     body,
@@ -121,6 +123,7 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 	}
 
 	userInfo, err := ParseUserInfo(body)
+
 	if err != nil {
 		return nil, errors.Errorf("oidc: failed to parse userInfo body: %v", err)
 	}

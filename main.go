@@ -173,6 +173,15 @@ func main() {
 		groupsClaim: c.GroupsClaim,
 	}
 
+	opaqueTokenAuthenticator := &opaqueTokenAuthenticator{
+		header:       c.IDTokenHeader,
+		caBundle:     caBundle,
+		provider:     provider,
+		oauth2Config: oauth2Config,
+		userIDClaim:  c.UserIDClaim,
+		groupsClaim:  c.GroupsClaim,
+	}
+
 	// Set the bearerUserInfoCache cache to store
 	// the (Bearer Token, UserInfo) pairs.
 	bearerUserInfoCache := cache.New(time.Duration(c.CacheExpirationMinutes)*time.Minute, time.Duration(CacheCleanupInterval)*time.Minute)
@@ -212,6 +221,7 @@ func main() {
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{
 			k8sAuthenticator,
+			opaqueTokenAuthenticator,
 			jwtTokenAuthenticator,
 			sessionAuthenticator,
 			idTokenAuthenticator,

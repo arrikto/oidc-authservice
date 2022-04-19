@@ -29,9 +29,10 @@ var (
 	SessionLogoutPath     = "/logout"
 	authenticatorsMapping = []string{
 		0: "kubernetes authenticator",
-		1: "JWT access token authenticator",
-		2: "session authenticator",
-		3: "idtoken authenticator",
+		1: "opaque access token authenticator",
+		2: "JWT access token authenticator",
+		3: "session authenticator",
+		4: "idtoken authenticator",
 	}
 )
 
@@ -140,7 +141,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// If AuthService encountered an authenticator-specific error,
-// then no other authentication methods will be tested.
+			// then no other authentication methods will be tested.
 			var authnError *authenticatorSpecificError
 			if errors.As(err, &authnError) {
 				returnMessage(w, http.StatusUnauthorized, authnError.Error())
