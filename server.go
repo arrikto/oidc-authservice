@@ -28,10 +28,10 @@ var (
 	OIDCCallbackPath      = "/oidc/callback"
 	SessionLogoutPath     = "/logout"
 	authenticatorsMapping = []string{
-		0: "session authenticator",
-		1: "idtoken authenticator",
-		2: "JWT access token authenticator",
-		3: "kubernetes authenticator",
+		0: "kubernetes authenticator",
+		1: "JWT access token authenticator",
+		2: "session authenticator",
+		3: "idtoken authenticator",
 	}
 )
 

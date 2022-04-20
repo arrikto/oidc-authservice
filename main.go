@@ -211,10 +211,10 @@ func main() {
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
 		authenticators: []authenticator.Request{
+			k8sAuthenticator,
+			jwtTokenAuthenticator,
 			sessionAuthenticator,
 			idTokenAuthenticator,
-			jwtTokenAuthenticator,
-			k8sAuthenticator,
 		},
 		authorizers: []Authorizer{groupsAuthorizer},
 	}
