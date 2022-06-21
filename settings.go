@@ -45,14 +45,18 @@ type config struct {
 	IDTokenHeader     string `split_words:"true" default:"Authorization" envconfig:"ID_TOKEN_HEADER"`
 
 	// Infra
-	Hostname           string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
-	Port               int    `split_words:"true" default:"8080" envconfig:"SERVER_PORT"`
-	WebServerPort      int    `split_words:"true" default:"8082"`
-	ReadinessProbePort int    `split_words:"true" default:"8081"`
-	CABundlePath       string `split_words:"true" envconfig:"CA_BUNDLE"`
-	SessionStorePath   string `split_words:"true" default:"/var/lib/authservice/data.db"`
-	SessionMaxAge      int    `split_words:"true" default:"86400"`
-	SessionSameSite    string `split_words:"true" default:"Lax"`
+	Hostname              string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
+	Port                  int    `split_words:"true" default:"8080" envconfig:"SERVER_PORT"`
+	WebServerPort         int    `split_words:"true" default:"8082"`
+	ReadinessProbePort    int    `split_words:"true" default:"8081"`
+	CABundlePath          string `split_words:"true" envconfig:"CA_BUNDLE"`
+	SessionStoreType      string `split_words:"true" default:"boltdb"`
+	SessionStorePath      string `split_words:"true" default:"/var/lib/authservice/data.db"`
+	SessionStoreRedisAddr string `split_words:"true" default:"127.0.0.1:6379"`
+	SessionStoreRedisPWD  string `split_words:"true" default:"" envconfig:"SESSION_STORE_REDIS_PWD"`
+	SessionStoreRedisDB   int    `split_words:"true" default:"0" envconfig:"SESSION_STORE_REDIS_DB"`
+	SessionMaxAge         int    `split_words:"true" default:"86400"`
+	SessionSameSite       string `split_words:"true" default:"Lax"`
 
 	// Site
 	ClientName          string            `split_words:"true" default:"AuthService"`
@@ -96,6 +100,10 @@ func parseConfig() (*config, error) {
 	if !validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn){
 		log.Fatalf("Unsupported access token authentication configuration:" +
 			"ACCESS_TOKEN_AUTHN=%s",c.AccessTokenAuthn)
+	}
+	if !validSessionStoreType(c.SessionStoreType){
+		log.Fatalf("Unsupported value for the type of the session store:" +
+			"SESSION_STORE_TYPE=%s",c.SessionStoreType)
 	}
 	c.UserTemplateContext = getEnvsFromPrefix("TEMPLATE_CONTEXT_")
 
@@ -160,6 +168,23 @@ func validAccessTokenAuthn(AccessTokenAuthnEnabledEnv bool, AccessTokenAuthnEnv 
 	log.Info("Please select exactly one of the supported options: " +
 	"i) jwt: to enable the JWT access token authentication method, " +
 	"ii) opaque: to enable the opaque access token authentication method")
+
+	return false
+}
+
+// validSessionStoreType() examines if the admins have configured a valid value
+// for the SESSION_STORE_TYPE envvar.
+func validSessionStoreType(SessionStoreType string) (bool){
+	if SessionStoreType == "boltdb" {
+		return true
+	}
+	if SessionStoreType == "redis"{
+		return true
+	}
+
+	log.Info("Please select exactly one of the options: " +
+	"i) boltdb: to select the BoltDB supported session store, " +
+	"ii) redis: to select the Redis supported session store")
 
 	return false
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
-	"github.com/yosssi/boltstore/shared"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -105,22 +104,11 @@ func main() {
 		endpoint.AuthURL = c.OIDCAuthURL.String()
 	}
 
-	// Setup session store
-	// Using BoltDB by default
-	store, err := newBoltDBSessionStore(c.SessionStorePath,
-		shared.DefaultBucketName, false)
-	if err != nil {
-		log.Fatalf("Error creating session store: %v", err)
-	}
-	defer store.Close()
+	// Setup session store and state store using the configured session store
+	// type (BoltDB, or redis)
+	store, oidcStateStore := initiateSessionStores(c)
 
-	// Setup state store
-	// Using BoltDB by default
-	oidcStateStore, err := newBoltDBSessionStore(c.OIDCStateStorePath,
-		"oidc_state", true)
-	if err != nil {
-		log.Fatalf("Error creating oidc state store: %v", err)
-	}
+	defer store.Close()
 	defer oidcStateStore.Close()
 
 	// Get Kubernetes authenticator

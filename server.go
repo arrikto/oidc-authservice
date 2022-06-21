@@ -46,8 +46,8 @@ func init() {
 type server struct {
 	provider                *oidc.Provider
 	oauth2Config            *oauth2.Config
-	store                   sessions.Store
-	oidcStateStore          sessions.Store
+	store                   ClosableStore
+	oidcStateStore          ClosableStore
 	bearerUserInfoCache     *cache.Cache
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer

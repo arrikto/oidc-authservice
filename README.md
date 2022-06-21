@@ -89,7 +89,7 @@ To expose the web server in an environment like Kubernetes with Istio, you need 
 | `THEME` | `kubeflow` | Path under `THEMES_URL` where the theme assets are served. |
 | `TEMPLATE_CONTEXT_<key>` | `empty` | Variables that will end up in the user-defined map in the template context. For example, if you define `TEMPLATE_CONTEXT_KEY=VALUE`, then a `KEY: VALUE` entry will be added to the user-defined map in the template context. Used to pass values to site templates and allow for further customization. |
 
-OIDC-AuthService stores sessions and other state in a local file using BoltDB.
+OIDC-AuthService stores sessions and other state in a local file. The users can select between using BoltDB which is the default option or redis for the session store.
 Session store-related settings:
 
 | Setting | Default | Description |
@@ -98,6 +98,10 @@ Session store-related settings:
 | `OIDC_STATE_STORE_PATH` | "/var/lib/authservice/oidc_state.db" | Path to the session store used to save the sessions for the OIDC state parameter. |
 | `SESSION_MAX_AGE` | "86400" | Time in seconds after which sessions expire. Defaults to a day (24h). |
 | `SESSION_SAME_SITE` | "Lax" | SameSite attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite). Its value can be "None", "Lax" or "Strict". |
+| `SESSION_STORE_TYPE`| "boltdb" | Set `SESSION_STORE_TYPE` to either "boltdb" to use BoltDB as the session store, or "redis" to use redis as the session store. Note that only one of the two can be used, also if you select redis then depending on your redis configurations then you might need to set the password and the number of the database that OIDC-AuthService will use as a [redis-client](https://redis.uptrace.dev/guide/go-redis.html#connecting-to-redis-server).|
+| `SESSION_STORE_REDIS_ADDR`| "127.0.0.1:6379" | Set the `host:port` address for the redis session store. |
+| `SESSION_STORE_REDIS_PWD`| "" | Set the password to connect with the redis session store. |
+| `SESSION_STORE_REDIS_DB`| 0 | Set the number of the database that AuthService should use. If not configured and if the redis session store is selected, then AuthService will use the default redis database. |
 
 By default, the AuthService keeps sessions to check if a user is authenticated. However, there may be times where
 we want to check a user's logged in status at the Provider, effectively making the Provider the one keeping the
@@ -135,7 +139,7 @@ By default, OIDC AuthService attempts to authenticate client requests with each 
 | `IDTOKEN_AUTHN_ENABLED` | `true` | Set `IDTOKEN_AUTHN_ENABLED` to `false` to disable the ID token authentication method. |
 | `KUBERNETES_AUTHN_ENABLED` | `true` | Set `KUBERNETES_AUTHN_ENABLED` to `false` to disable the Kubernetes authentication method. |
 | `ACCESS_TOKEN_AUTHN_ENABLED` | `true` | Set `ACCESS_TOKEN_AUTHN_ENABLED` to `false` to disable both the access token authentication methods. |
-| `ACCESS_TOKEN_AUTHN` | "jwt" | Set `ACCESS_TOKEN_AUTHN` to either "jwt" to enable the JWT access token authentication method, or "opaque" to enable the opaque access token authentication method. Note the only one of the two access token authentication methods can be used. |
+| `ACCESS_TOKEN_AUTHN` | "jwt" | Set `ACCESS_TOKEN_AUTHN` to either "jwt" to enable the JWT access token authentication method, or "opaque" to enable the opaque access token authentication method. Note that only one of the two access token authentication methods can be used. |
 
 OIDC AuthService can also perform basic authorization checks. The following
 settings are related to authorization:
