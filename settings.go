@@ -45,14 +45,16 @@ type config struct {
 	IDTokenHeader     string `split_words:"true" default:"Authorization" envconfig:"ID_TOKEN_HEADER"`
 
 	// Infra
-	Hostname           string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
-	Port               int    `split_words:"true" default:"8080" envconfig:"SERVER_PORT"`
-	WebServerPort      int    `split_words:"true" default:"8082"`
-	ReadinessProbePort int    `split_words:"true" default:"8081"`
-	CABundlePath       string `split_words:"true" envconfig:"CA_BUNDLE"`
-	SessionStorePath   string `split_words:"true" default:"/var/lib/authservice/data.db"`
-	SessionMaxAge      int    `split_words:"true" default:"86400"`
-	SessionSameSite    string `split_words:"true" default:"Lax"`
+	Hostname              string `split_words:"true" envconfig:"SERVER_HOSTNAME"`
+	Port                  int    `split_words:"true" default:"8080" envconfig:"SERVER_PORT"`
+	WebServerPort         int    `split_words:"true" default:"8082"`
+	ReadinessProbePort    int    `split_words:"true" default:"8081"`
+	CABundlePath          string `split_words:"true" envconfig:"CA_BUNDLE"`
+	SessionStoreType      string `split_words:"true" default:"boltdb"`
+	SessionStorePath      string `split_words:"true" default:"/var/lib/authservice/data.db"`
+	SessionStoreRedisAddr string `split_words:"true" default:"127.0.0.1:6379"`
+	SessionMaxAge         int    `split_words:"true" default:"86400"`
+	SessionSameSite       string `split_words:"true" default:"Lax"`
 
 	// Site
 	ClientName          string            `split_words:"true" default:"AuthService"`
