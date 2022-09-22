@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /go
 # Release Image #
 #################
 
-FROM alpine:3.12
+FROM alpine:3.16
 RUN apk add --no-cache ca-certificates
 
 ENV USER=authservice
