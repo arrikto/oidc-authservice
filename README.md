@@ -143,6 +143,7 @@ settings are related to authorization:
 | Setting | Default | Description |
 | - | - | - |
 | `GROUPS_ALLOWLIST` | "*" | List of groups that are allowed to pass authorization. By default, all groups are allowed. If you change this option, you may want to include the `system:serviceaccounts` group explicitly, if you need the AuthService to accept ServiceAccountTokens. |
+| `EXTERNAL_AUTHZ_URL` | "" | Use an external authorization service. This option is disabled by default, to enable set the value to the target external authorization service (e.g. `EXTERNAL_AUTHZ_URL=http://authorizer/auth`). If you have enabled this option then for a request to be authorized, **both** the group and the external authorization service will have to allow the request. |
 
 ## Usage
 

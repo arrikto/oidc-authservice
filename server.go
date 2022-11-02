@@ -173,10 +173,10 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	logger = logger.WithField("user", userInfo)
 	logger.Info("Authorizing request...")
 
-	for i, authz := range s.authorizers {
+	for _, authz := range s.authorizers {
 		allowed, reason, err := authz.Authorize(r, userInfo)
 		if err != nil {
-			logger.Errorf("Error authorizing request using authorizer %d: %v", i, err)
+			logger.Errorf("Error authorizing request using authorizer %T: %v", authz, err)
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -184,7 +184,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 		// TODO: Only revoke if the authenticator that provided the identity is
 		// the session authenticator.
 		if !allowed {
-			logger.Infof("Authorizer '%d' denied the request with reason: '%s'", i, reason)
+			logger.Infof("Authorizer '%T' denied the request with reason: '%s'", authz, reason)
 			session, _, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
 			if err != nil {
 				logger.Errorf("Error getting session for request: %v", err)

@@ -72,7 +72,8 @@ type config struct {
 	AccessTokenAuthn        string `split_words:"true" default:"jwt" envconfig:"ACCESS_TOKEN_AUTHN"`
 
 	// Authorization
-	GroupsAllowlist []string `split_words:"true" default:"*"`
+	GroupsAllowlist  []string `split_words:"true" default:"*"`
+	ExternalAuthzUrl string   `split_words:"true" default:""`
 }
 
 func parseConfig() (*config, error) {

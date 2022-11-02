@@ -142,6 +142,7 @@ func main() {
 		Scopes:       c.OIDCScopes,
 	}
 
+	// Setup authenticators.
 	sessionAuthenticator := &sessionAuthenticator{
 		store:                   store,
 		cookie:                  userSessionCookie,
@@ -151,8 +152,6 @@ func main() {
 		provider:                provider,
 		oauth2Config:            oauth2Config,
 	}
-
-	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
 
 	idTokenAuthenticator := &idTokenAuthenticator{
 		header:      c.IDTokenHeader,
@@ -168,7 +167,7 @@ func main() {
 		caBundle:    caBundle,
 		provider:    provider,
 		audiences:   c.Audiences,
-		issuer:	     c.ProviderURL.String(),
+		issuer:      c.ProviderURL.String(),
 		userIDClaim: c.UserIDClaim,
 		groupsClaim: c.GroupsClaim,
 	}
@@ -185,6 +184,19 @@ func main() {
 	// Set the bearerUserInfoCache cache to store
 	// the (Bearer Token, UserInfo) pairs.
 	bearerUserInfoCache := cache.New(time.Duration(c.CacheExpirationMinutes)*time.Minute, time.Duration(CacheCleanupInterval)*time.Minute)
+
+	// Configure the authorizers.
+	var authorizers []Authorizer
+
+	// Add the groups' authorizer.
+	groupsAuthorizer := newGroupsAuthorizer(c.GroupsAllowlist)
+	authorizers = append(authorizers, groupsAuthorizer)
+
+	// Add the external authorizer.
+	if c.ExternalAuthzUrl != "" {
+		externalAuthorizer := ExternalAuthorizer{c.ExternalAuthzUrl}
+		authorizers = append(authorizers, externalAuthorizer)
+	}
 
 	// Set the server values.
 	// The isReady atomic variable should protect it from concurrency issues.
@@ -227,7 +239,7 @@ func main() {
 			sessionAuthenticator,
 			idTokenAuthenticator,
 		},
-		authorizers: []Authorizer{groupsAuthorizer},
+		authorizers: authorizers,
 	}
 	switch c.SessionSameSite {
 	case "None":
