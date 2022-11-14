@@ -124,13 +124,23 @@ func main() {
 	defer oidcStateStore.Close()
 
 	// Get Kubernetes authenticator
+	var k8sAuthenticator authenticator.Request
 	restConfig, err := clientconfig.GetConfig()
-	if err != nil {
+	if err != nil && c.KubernetesAuthnEnabled {
 		log.Fatalf("Error getting K8s config: %v", err)
-	}
-	k8sAuthenticator, err := newKubernetesAuthenticator(restConfig, c.Audiences)
-	if err != nil {
-		log.Fatalf("Error creating K8s authenticator: %v", err)
+	} else if err != nil {
+		// If Kubernetes authenticator is disabled, ignore the error.
+		log.Debugf("Error getting K8s config: %v. " +
+			"Kubernetes authenticator is disabled, skipping ...", err)
+	} else {
+		k8sAuthenticator, err = newKubernetesAuthenticator(restConfig, c.Audiences)
+		if err != nil && c.KubernetesAuthnEnabled {
+			log.Fatalf("Error creating K8s authenticator: %v", err)
+		} else if err != nil {
+			// If Kubernetes authenticator is disabled, ignore the error.
+			log.Debugf("Error creating K8s authenticator:: %v. " +
+				"Kubernetes authenticator is disabled, skipping ...", err)
+		}
 	}
 
 	// Get OIDC Session Authenticator
