@@ -15,23 +15,22 @@ const (
 	// Issuer: "Issuer", Username: "Test", "Role: Test"
 	JWT = "eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiVGVzdCIsIklzc3VlciI6Iklzc3VlciIsIlVzZXJuYW1lIjoiVGVzdCIsImV4cCI6MTY2NzM4MzY0MiwiaWF0IjoxNjY3MzgzNjQyfQ.D75w4zDiQfTwDtrFCz0m9qlBalLhoEhxWqw83unoFCk\n"
 	/* The decoded JWT token has the following content:
-	   Header:
-	   {
-             "alg": "HS256"
-           }
-	   Payload:
-	   {
-             "Role": "Test",
-             "Issuer": "Issuer",
-             "Username": "Test",
-             "exp": 1667383642,
-             "iat": 1667383642
-           }
+	Header:
+	{
+		"alg": "HS256"
+	}
+	Payload:
+	{
+		"Role": "Test",
+		"Issuer": "Issuer",
+		"Username": "Test",
+		"exp": 1667383642,
+		"iat": 1667383642
+	}
 	*/
 )
 
-
-func createRequest(addJWT bool) *http.Request {
+func createRequest(host string, addJWT bool) *http.Request {
 	var currentUrl url.URL
 	currentUrl.Path = "/test"
 	var headers = http.Header{}
@@ -41,7 +40,7 @@ func createRequest(addJWT bool) *http.Request {
 	return &http.Request{
 		Method: "GET",
 		URL:    &currentUrl,
-		Host:   "host:80",
+		Host:   host,
 		Header: headers,
 	}
 }
@@ -71,18 +70,18 @@ func TestExternalAuthorizer_Authorize(t *testing.T) {
 		{
 			name: "user is allowed",
 			args: args{
-				r:        createRequest(true),
+				r:        createRequest("host:80", true),
 				userinfo: &user.DefaultInfo{Name: "Test"},
 			},
 			httpMock: httpMock{
-				url: mockAuthUrl,
+				url:    mockAuthUrl,
 				method: "POST",
 				status: 200,
 				body:   "User Allowed",
 			},
 			checks: func(t *testing.T) {
 				// Verify that a call has been made in the backend.
-				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v",mockAuthUrl)]
+				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v", mockAuthUrl)]
 				require.Equal(t, 1, calls)
 			},
 			expectAllowed: true,
@@ -92,18 +91,18 @@ func TestExternalAuthorizer_Authorize(t *testing.T) {
 		{
 			name: "user is unauthorized",
 			args: args{
-				r:        createRequest(true),
+				r:        createRequest("host:80", true),
 				userinfo: &user.DefaultInfo{Name: "Test"},
 			},
 			httpMock: httpMock{
-				url: mockAuthUrl,
+				url:    mockAuthUrl,
 				method: "POST",
 				status: 401,
 				body:   "User Unauthorized",
 			},
 			checks: func(t *testing.T) {
 				// Verify that a call has been made in the backend.
-				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v",mockAuthUrl)]
+				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v", mockAuthUrl)]
 				require.Equal(t, 1, calls)
 			},
 			expectAllowed: false,
@@ -113,18 +112,18 @@ func TestExternalAuthorizer_Authorize(t *testing.T) {
 		{
 			name: "authorization server exception",
 			args: args{
-				r:        createRequest(true),
+				r:        createRequest("host:80", true),
 				userinfo: &user.DefaultInfo{Name: "Test"},
 			},
 			httpMock: httpMock{
-				url: mockAuthUrl,
+				url:    mockAuthUrl,
 				method: "POST",
 				status: 500,
 				body:   "Internal server error",
 			},
 			checks: func(t *testing.T) {
 				// Verify that a call has been made in the backend.
-				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v",mockAuthUrl)]
+				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v", mockAuthUrl)]
 				require.Equal(t, 1, calls)
 			},
 			expectAllowed: false,
@@ -134,18 +133,18 @@ func TestExternalAuthorizer_Authorize(t *testing.T) {
 		{
 			name: "connection error",
 			args: args{
-				r:        createRequest(true),
+				r:        createRequest("host:80", true),
 				userinfo: &user.DefaultInfo{Name: "Test"},
 			},
 			httpMock: httpMock{
-				url: "http://wrongurl/auth",
+				url:    "http://wrongurl/auth",
 				method: "POST",
 				status: 500,
 				body:   "Internal server error",
 			},
 			checks: func(t *testing.T) {
 				// Verify that a call has not been made in the backend.
-				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v",mockAuthUrl)]
+				calls := httpmock.GetCallCountInfo()[fmt.Sprintf("POST %v", mockAuthUrl)]
 				require.Equal(t, 0, calls)
 			},
 			expectAllowed: false,
@@ -182,14 +181,54 @@ func TestExternalAuthorizer_Authorize(t *testing.T) {
 }
 
 func TestExternalAuthorizer_getRequestInfo(t *testing.T) {
-	e := ExternalAuthorizer{
-		url: mockAuthUrl,
+	type fields struct {
+		url string
 	}
+	type args struct {
+		r *http.Request
+	}
+	tests := []struct {
+		name          string
+		fields        fields
+		args          args
+		expectRequest AuthorizationRequestInfo
+	}{
+		{
+			name: "request with host:443",
+			args: args{
+				r: createRequest("host:443", true),
+			},
+			expectRequest: AuthorizationRequestInfo{
+				Host:   "host",
+				Port:   443,
+				Path:   "/test",
+				Method: "GET",
+			},
+		},
+		{
+			name: "request with host without port",
+			args: args{
+				r: createRequest("host", true),
+			},
+			expectRequest: AuthorizationRequestInfo{
+				Host:   "host",
+				Port:   80,
+				Path:   "/test",
+				Method: "GET",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			e := ExternalAuthorizer{
+				url: test.fields.url,
+			}
+			gotRequest := e.getRequestInfo(test.args.r)
+			require.Equal(t, gotRequest, test.expectRequest,
+				"getRequestInfo() = %v, expect %v", gotRequest, test.expectRequest)
 
-	request := createRequest(true)
-
-	r := e.getRequestInfo(request)
-	require.Equal(t, AuthorizationRequestInfo{"host", 80, "/test", "GET"}, r)
+		})
+	}
 }
 
 func TestExternalAuthorizer_getUserInfo(t *testing.T) {
@@ -200,19 +239,19 @@ func TestExternalAuthorizer_getUserInfo(t *testing.T) {
 		r        *http.Request
 		userinfo user.Info
 	}
-	nonJWTAuthorization := createRequest(false)
+	nonJWTAuthorization := createRequest("host:80", false)
 	nonJWTAuthorization.Header.Add("Authorization", "Bearer: Test")
 	tests := []struct {
-		name     string
-		fields   fields
-		args     args
+		name       string
+		fields     fields
+		args       args
 		expectInfo AuthorizationUserInfo
 	}{
 		{
 			name:   "parse user info without JWT",
 			fields: fields{mockAuthUrl},
 			args: args{
-				r: createRequest(false),
+				r: createRequest("host:80", false),
 				userinfo: &user.DefaultInfo{
 					Name:   "Test",
 					UID:    "1",
@@ -232,7 +271,7 @@ func TestExternalAuthorizer_getUserInfo(t *testing.T) {
 			name:   "parse user info with JWT",
 			fields: fields{mockAuthUrl},
 			args: args{
-				r: createRequest(true),
+				r: createRequest("host:80", true),
 				userinfo: &user.DefaultInfo{
 					Name:   "Test",
 					UID:    "1",

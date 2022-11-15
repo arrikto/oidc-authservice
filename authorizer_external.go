@@ -104,10 +104,15 @@ func (e ExternalAuthorizer) getUserInfo(r *http.Request, userinfo user.Info) Aut
 // getRequestInfo creates a AuthorizationRequestInfo object for the current 
 // context.
 func (e ExternalAuthorizer) getRequestInfo(r *http.Request) (request AuthorizationRequestInfo) {
-	host := strings.Split(r.Host, ":")[0]
-	port, _ := strconv.Atoi(strings.Split(r.Host, ":")[1])
+	host := strings.Split(r.Host, ":")
+	// Use 80 as a fallback.
+	var port = 80
+	if len(host) > 1 {
+		port, _ = strconv.Atoi(host[1])
+	}
+	hostname := host[0]
 	return AuthorizationRequestInfo{
-		Host:   host,
+		Host:   hostname,
 		Port:   port,
 		Path:   r.URL.Path,
 		Method: r.Method,
