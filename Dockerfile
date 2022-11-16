@@ -2,7 +2,7 @@
 # Builder Image #
 #################
 
-FROM golang:1.15.3-alpine3.12 as builder
+FROM golang:1.18.8-alpine3.16 as builder
 
 ENV GO111MODULE=on
 WORKDIR /go/src/oidc-authservice

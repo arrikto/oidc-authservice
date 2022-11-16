@@ -7,6 +7,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -22,9 +23,10 @@ type kubernetesAuthenticator struct {
 
 func newKubernetesAuthenticator(c *rest.Config, aud []string) (authenticator.Request, error) {
 	config := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:               false,
-		TokenAccessReviewClient: kubernetes.NewForConfigOrDie(c).AuthenticationV1().TokenReviews(),
-		APIAudiences:            aud,
+		Anonymous:                false,
+		TokenAccessReviewClient:  kubernetes.NewForConfigOrDie(c).AuthenticationV1(),
+		WebhookRetryBackoff:      webhook.DefaultRetryBackoff(),
+		APIAudiences:             aud,
 	}
 	k8sAuthenticator, _, err := config.New()
 	return &kubernetesAuthenticator{audiences: aud, authenticator: k8sAuthenticator}, err
