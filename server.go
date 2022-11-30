@@ -58,8 +58,8 @@ type server struct {
 	strictSessionValidation bool
 
 	// Cache Configurations
-	cacheEnabled            bool
-	cacheExpirationMinutes  int
+	cacheEnabled           bool
+	cacheExpirationMinutes int
 
 	// Authenticators Configurations
 	IDTokenAuthnEnabled     bool
@@ -67,12 +67,12 @@ type server struct {
 	AccessTokenAuthnEnabled bool
 	AccessTokenAuthn        string
 
-	authHeader              string
-	idTokenOpts             jwtClaimOpts
-	upstreamHTTPHeaderOpts  httpHeaderOpts
-	userIdTransformer       UserIDTransformer
-	caBundle                []byte
-	sessionSameSite         http.SameSite
+	authHeader             string
+	idTokenOpts            jwtClaimOpts
+	upstreamHTTPHeaderOpts httpHeaderOpts
+	userIdTransformer      UserIDTransformer
+	caBundle               []byte
+	sessionSameSite        http.SameSite
 }
 
 // jwtClaimOpts specifies the location of the user's identity inside a JWT's
@@ -98,29 +98,18 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 
 	var userInfo user.Info
 	for i, auth := range s.authenticators {
-		if !s.enabledAuthenticator(authenticatorsMapping[i]){
+		if !s.enabledAuthenticator(authenticatorsMapping[i]) {
 			continue
 		}
 
 		var cacheKey string
 
 		if s.cacheEnabled {
-			// If the cache is enabled, check if the current authenticator implements the Cacheable interface.
-			cacheable := reflect.TypeOf((*Cacheable)(nil)).Elem()
-			isCacheable := reflect.TypeOf(auth).Implements(cacheable)
-
-			if isCacheable {
-				// Store the key that we are going to use for caching UserDetails.
-				// We store it before the authentication, because the authenticators may mutate the request object.
-				logger.Debugf("Retrieving the cache key...")
-				cacheableAuthenticator := reflect.ValueOf(auth).Interface().(Cacheable)
-				cacheKey = cacheableAuthenticator.getCacheKey(r)
-			}
-		}
-
-		if cacheKey != "" {
-			// If caching is enabled, try to retrieve the UserInfo from cache.
-			userInfo = s.getCachedUserInfo(cacheKey, r)
+			// If caching is enabled, and the current authenticator
+			// implements the cacheable interface then try to
+			// retrieve the UserInfo from cache and the cacheKey for
+			// this cache entry.
+			userInfo, cacheKey = s.getCachedUser(auth, r)
 
 			if userInfo != nil {
 				logger.Infof("Successfully authenticated request using the cache.")
@@ -156,7 +145,10 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			logger.Infof("UserInfo: %+v", userInfo)
 
 			if s.cacheEnabled && cacheKey != "" {
-				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
+				// If cache is enabled and the current
+				// authenticator is Cacheable, store the UserInfo
+				// to cache.
+
 				logger.Infof("Caching authenticated UserInfo...")
 				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)
 			}
@@ -212,19 +204,38 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// getCachedUserInfo returns the UserInfo if it's in the cache
-// using the key: 'cacheKey' or it returns nil.
-func (s *server) getCachedUserInfo(cacheKey string, r *http.Request) user.Info {
+// getCachedUser returns:
+// * the cacheKey
+// * the UserInfo
+// if there is an entry in the cache for the examined user.
+// Otherwise, it returns an empty string for the cacheKey and nil respectively.
+func (s *server) getCachedUser(auth authenticator.Request, r *http.Request) (user.Info, string) {
 	logger := loggerForRequest(r, logModuleInfo)
 
-	cachedUserInfo, found := s.bearerUserInfoCache.Get(cacheKey)
-	if found {
-		userInfo := cachedUserInfo.(user.Info)
-		logger.Infof("Found Cached UserInfo: %+v", userInfo)
-		return userInfo
+	// If the cache is enabled, check if the current authenticator implements the Cacheable interface.
+	cacheable := reflect.TypeOf((*Cacheable)(nil)).Elem()
+	isCacheable := reflect.TypeOf(auth).Implements(cacheable)
+
+	if isCacheable {
+		// Store the key that we are going to use for caching UserDetails.
+		// We store it before the authentication, because the authenticators may mutate the request object.
+		logger.Debugf("Retrieving the cache key...")
+		cacheableAuthenticator := reflect.ValueOf(auth).Interface().(Cacheable)
+		cacheKey := cacheableAuthenticator.getCacheKey(r)
+
+		if cacheKey != "" {
+			cachedUserInfo, found := s.bearerUserInfoCache.Get(cacheKey)
+			if found {
+				userInfo := cachedUserInfo.(user.Info)
+				logger.Infof("Found Cached UserInfo: %+v", userInfo)
+				return userInfo, cacheKey
+			}
+			return nil, cacheKey
+		}
 	}
+
 	logger.Info("The UserInfo is not cached.")
-	return nil
+	return nil, ""
 }
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
@@ -364,7 +375,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 }
 
 // enabledAuthenticator indicates if the examined authenticator is enabled.
-func (s *server) enabledAuthenticator(authenticator string) (bool){
+func (s *server) enabledAuthenticator(authenticator string) bool {
 	if authenticator == "kubernetes authenticator" && s.KubernetesAuthnEnabled {
 		return true
 	}
