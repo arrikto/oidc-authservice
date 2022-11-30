@@ -31,6 +31,7 @@ type config struct {
 	HomepageURL          *url.URL `split_words:"true"`
 	AfterLoginURL        *url.URL `split_words:"true"`
 	AfterLogoutURL       *url.URL `split_words:"true"`
+	VerifyAuthURL        *url.URL `split_words:"true"`
 
 	// Identity Headers
 	UserIDHeader      string            `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
@@ -92,6 +93,9 @@ func parseConfig() (*config, error) {
 	}
 	if len(c.AfterLogoutURL.String()) == 0 {
 		c.AfterLogoutURL = resolvePathReference(c.AuthserviceURLPrefix, AfterLogoutPath)
+	}
+	if len(c.VerifyAuthURL.String()) == 0 {
+		c.VerifyAuthURL = resolvePathReference(c.AuthserviceURLPrefix, VerifyEndpoint)
 	}
 	if !validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn){
 		log.Fatalf("Unsupported access token authentication configuration:" +

@@ -221,6 +221,7 @@ func main() {
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
+		verifyAuthURL:          c.VerifyAuthURL.String(),
 		idTokenOpts: jwtClaimOpts{
 			userIDClaim: c.UserIDClaim,
 			groupsClaim: c.GroupsClaim,
