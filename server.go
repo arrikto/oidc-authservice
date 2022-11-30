@@ -114,36 +114,10 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	logger = logger.WithField("user", userInfo)
 	logger.Info("Authorizing request...")
 
-	for _, authz := range s.authorizers {
-		allowed, reason, err := authz.Authorize(r, userInfo)
-		if err != nil {
-			logger.Errorf("Error authorizing request using authorizer %T: %v", authz, err)
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		// If the request is not allowed, try to revoke the user's session.
-		// TODO: Only revoke if the authenticator that provided the identity is
-		// the session authenticator.
-		if !allowed {
-			logger.Infof("Authorizer '%T' denied the request with reason: '%s'", authz, reason)
-			session, _, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
-			if err != nil {
-				logger.Errorf("Error getting session for request: %v", err)
-			}
-			if !session.IsNew {
-				err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
-				if err != nil {
-					logger.Errorf("Failed to revoke session after authorization fail: %v", err)
-				}
-			}
-			// TODO: Move this to the web server and make it prettier
-			msg := fmt.Sprintf("User '%s' failed authorization with reason: %s. "+
-				"Click <a href='%s'> here</a> to login again.", userInfo.GetName(),
-				reason, s.homepageURL)
-
-			returnHTML(w, http.StatusForbidden, msg)
-			return
-		}
+	// Ensure that all authorizers allow the access to the requested resource
+	authorized = s.authorized(w, r, userInfo)
+	if !authorized {
+		return
 	}
 
 	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
@@ -222,6 +196,47 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request) (user
 		}
 	}
 	return nil, true
+}
+
+// authorize tries out all of the available authorizers. If at least one of them
+// does not allow the user to make the request then AuthService denies the access
+// to this resource.
+func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo user.Info) bool {
+	logger := loggerForRequest(r, logModuleInfo)
+
+	for _, authz := range s.authorizers {
+		allowed, reason, err := authz.Authorize(r, userInfo)
+		if err != nil {
+			logger.Errorf("Error authorizing request using authorizer %T: %v", authz, err)
+			w.WriteHeader(http.StatusForbidden)
+			return false
+		}
+		// If the request is not allowed, try to revoke the user's session.
+		// TODO: Only revoke if the authenticator that provided the identity is
+		// the session authenticator.
+		if !allowed {
+			logger.Infof("Authorizer '%T' denied the request with reason: '%s'", authz, reason)
+			session, _, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
+			if err != nil {
+				logger.Errorf("Error getting session for request: %v", err)
+			}
+			if !session.IsNew {
+				err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+				if err != nil {
+					logger.Errorf("Failed to revoke session after authorization fail: %v", err)
+				}
+			}
+			// TODO: Move this to the web server and make it prettier
+			msg := fmt.Sprintf("User '%s' failed authorization with reason: %s. "+
+				"Click <a href='%s'> here</a> to login again.", userInfo.GetName(),
+				reason, s.homepageURL)
+
+			returnHTML(w, http.StatusForbidden, msg)
+			return false
+		}
+	}
+
+	return true
 }
 
 // getCachedUser returns:
