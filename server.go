@@ -26,6 +26,7 @@ const (
 
 var (
 	OIDCCallbackPath      = "/oidc/callback"
+	VerifyEndpoint        = "/verify"
 	SessionLogoutPath     = "/logout"
 	authenticatorsMapping = []string{
 		0: "kubernetes authenticator",
@@ -54,6 +55,7 @@ type server struct {
 	afterLoginRedirectURL   string
 	homepageURL             string
 	afterLogoutRedirectURL  string
+	verifyAuthURL           string
 	sessionMaxAgeSeconds    int
 	strictSessionValidation bool
 
