@@ -96,62 +96,14 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	logger := loggerForRequest(r, logModuleInfo)
 	logger.Info("Authenticating request...")
 
-	var userInfo user.Info
-	for i, auth := range s.authenticators {
-		if !s.enabledAuthenticator(authenticatorsMapping[i]) {
-			continue
-		}
-
-		var cacheKey string
-
-		if s.cacheEnabled {
-			// If caching is enabled, and the current authenticator
-			// implements the cacheable interface then try to
-			// retrieve the UserInfo from cache and the cacheKey for
-			// this cache entry.
-			userInfo, cacheKey = s.getCachedUser(auth, r)
-
-			if userInfo != nil {
-				logger.Infof("Successfully authenticated request using the cache.")
-				logger.Infof("UserInfo: %+v", userInfo)
-				break
-			}
-		}
-
-		logger.Infof("%s starting...", strings.Title(authenticatorsMapping[i]))
-		resp, found, err := auth.AuthenticateRequest(r)
-		if err != nil {
-			logger.Errorf("Error authenticating request using %s: %v", authenticatorsMapping[i], err)
-			// If we get a login expired error, it means the authenticator
-			// recognised a valid authentication method which has expired
-			var expiredErr *loginExpiredError
-			if errors.As(err, &expiredErr) {
-				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
-				return
-			}
-
-			// If AuthService encountered an authenticator-specific error,
-			// then no other authentication methods will be tested.
-			var authnError *authenticatorSpecificError
-			if errors.As(err, &authnError) {
-				returnMessage(w, http.StatusUnauthorized, authnError.Error())
-				return
-			}
-
-		}
-		if found {
-			logger.Infof("Successfully authenticated request using %s", authenticatorsMapping[i])
-			userInfo = resp.User
-			logger.Infof("UserInfo: %+v", userInfo)
-
-			if s.cacheEnabled && cacheKey != "" {
-				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
-				logger.Infof("Caching authenticated UserInfo...")
-				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)
-			}
-			break
-		}
+	// Try each one of the available enabled authenticators, if none of them
+	// achieves to authenticate the request then userInfo will be nil and
+	// Authorization Code Flow will begin.
+	userInfo, authorized := s.tryAuthenticators(w, r)
+	if !authorized {
+		return
 	}
+
 	if userInfo == nil {
 		logger.Infof("Failed to authenticate using authenticators. Initiating OIDC Authorization Code flow...")
 		// TODO: Detect "X-Requested-With" header and return 401
@@ -199,6 +151,74 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	return
+}
+
+// tryAuthenticators will iterate over the available enabled authenticators.
+// If one of them manages to authenticate the user who is making the requester
+// then it will return their user Info and all the other authenticator will be
+// skipped.
+func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request) (user.Info, bool) {
+	logger := loggerForRequest(r, logModuleInfo)
+
+	var userInfo user.Info
+	for i, auth := range s.authenticators {
+		if !s.enabledAuthenticator(authenticatorsMapping[i]) {
+			continue
+		}
+
+		var cacheKey string
+
+		if s.cacheEnabled {
+			// If caching is enabled, and the current authenticator
+			// implements the cacheable interface then try to
+			// retrieve the UserInfo from cache and the cacheKey for
+			// this cache entry.
+			userInfo, cacheKey = s.getCachedUser(auth, r)
+
+			if userInfo != nil {
+				logger.Infof("Successfully authenticated request using the cache.")
+				logger.Infof("UserInfo: %+v", userInfo)
+				return userInfo, true
+			}
+		}
+
+		logger.Infof("%s starting...", strings.Title(authenticatorsMapping[i]))
+		resp, found, err := auth.AuthenticateRequest(r)
+		if err != nil {
+			logger.Errorf("Error authenticating request using %s: %v", authenticatorsMapping[i], err)
+			// If we get a login expired error, it means the
+			// authenticator recognised a valid authentication method
+			// which has expired
+			var expiredErr *loginExpiredError
+			if errors.As(err, &expiredErr) {
+				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
+				return nil, false
+			}
+
+			// If AuthService encountered an authenticator-specific
+			// error, then no other authentication methods will be
+			// tested.
+			var authnError *authenticatorSpecificError
+			if errors.As(err, &authnError) {
+				returnMessage(w, http.StatusUnauthorized, authnError.Error())
+				return nil, false
+			}
+
+		}
+		if found {
+			logger.Infof("Successfully authenticated request using %s", authenticatorsMapping[i])
+			userInfo = resp.User
+			logger.Infof("UserInfo: %+v", userInfo)
+
+			if s.cacheEnabled && cacheKey != "" {
+				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
+				logger.Infof("Caching authenticated UserInfo...")
+				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)
+			}
+			return userInfo, true
+		}
+	}
+	return nil, true
 }
 
 // getCachedUser returns:
