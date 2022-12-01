@@ -93,7 +93,58 @@ type httpHeaderOpts struct {
 	authMethodHeader string
 }
 
-func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
+// authenticate_or_login calls initiates the Authorization Code Flow if the user
+// cannot be authenticated with one of the available authenticators.
+func (s *server) authenticate_or_login(w http.ResponseWriter, r *http.Request) {
+	userInfo, authorized := s.authenticate(w, r, true)
+	if !authorized {
+		// The user is unauthorized to perform the request
+		return
+	}
+	// The user is successfully authenticated and authorized to perform the
+	// request. Proceed with writing the headers on the response and return
+	// the `200` HTTP status code.
+	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
+		w.Header().Set(k, v)
+	}
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+// authenticate_no_login will not initiate the Authorization Code Flow if the
+// user cannot be authenticated. This function will return:
+// * HTTP status 204: if the user is authenticated and authorized
+// * HTTP status 401 or 403: if not
+func (s *server) authenticate_no_login(w http.ResponseWriter, r *http.Request) {
+	userInfo, authorized := s.authenticate(w, r, false)
+	if !authorized {
+		// The user is unauthorized to perform the request
+		return
+	}
+	// The user is successfully authenticated and authorized to perform the
+	// request. Proceed with writing the headers on the response and return
+	// the `204` HTTP status code.
+	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
+		w.Header().Set(k, v)
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return
+}
+
+// authenticate is the core function of AuthService. It implements the following
+// steps:
+//  1. attempt to authenticate the user who is performing the examined request
+//  2. if the user could not be authenticated and promptLogin is false then
+//     initiate Authorization Code Flow and skip the next steps
+//  3. ensure that the authenticated user is authorized to access the requested
+//     resource, if they are not then deny the access and skip step 4
+//  4. update the headers of the request with the retrieved userInfo and allow the
+//     request
+//
+// We are calling this function from two wrappers:
+// * authenticate_no_login(), this is the handler of the /verify endpoint
+// * authenticate_or_login()
+func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
 
 	logger := loggerForRequest(r, logModuleInfo)
 	logger.Info("Authenticating request...")
@@ -101,16 +152,23 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	// Try each one of the available enabled authenticators, if none of them
 	// achieves to authenticate the request then userInfo will be nil and
 	// Authorization Code Flow will begin.
-	userInfo, authorized := s.tryAuthenticators(w, r)
+	userInfo, authorized := s.tryAuthenticators(w, r, promptLogin)
 	if !authorized {
-		return
+		return nil, false
 	}
 
 	if userInfo == nil {
+		// Preliminary check for the /verify endpoint
+		// if the user is not authenticated return 401
+		if !promptLogin {
+			returnMessage(w, http.StatusUnauthorized, "Unauthorized")
+			return nil, false
+		}
+
 		logger.Infof("Failed to authenticate using authenticators. Initiating OIDC Authorization Code flow...")
 		// TODO: Detect "X-Requested-With" header and return 401
 		s.authCodeFlowAuthenticationRequest(w, r)
-		return
+		return nil, false
 	}
 
 	logger = logger.WithField("user", userInfo)
@@ -119,21 +177,17 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	// Ensure that all authorizers allow the access to the requested resource
 	authorized = s.authorized(w, r, userInfo)
 	if !authorized {
-		return
+		return nil, false
 	}
 
-	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
-		w.Header().Set(k, v)
-	}
-	w.WriteHeader(http.StatusOK)
-	return
+	return userInfo, true
 }
 
 // tryAuthenticators will iterate over the available enabled authenticators.
 // If one of them manages to authenticate the user who is making the requester
 // then it will return their user Info and all the other authenticator will be
 // skipped.
-func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request) (user.Info, bool) {
+func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
 	logger := loggerForRequest(r, logModuleInfo)
 
 	var userInfo user.Info
@@ -186,7 +240,7 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request) (user
 			userInfo = resp.User
 			logger.Infof("UserInfo: %+v", userInfo)
 
-			if s.cacheEnabled && cacheKey != "" {
+			if s.cacheEnabled && cacheKey != "" && promptLogin {
 				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
 				logger.Infof("Caching authenticated UserInfo...")
 				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)
@@ -504,15 +558,27 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 // live are in the same cluster and requests pass through the AuthService.
 // Allowing the whitelisted requests before OIDC is configured is necessary for
 // the OIDC discovery request to succeed.
-func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
+func (s *server) whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool, verify bool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := loggerForRequest(r, logModuleInfo)
+
+			path := r.URL.Path
+			// If called by the `/authservice/verify` router then
+			// first trim the verifyAuthURL prefix and then examine
+			// if the remaining path is whitelisted.
+			if verify {
+				path = strings.TrimPrefix(r.URL.Path, s.verifyAuthURL)
+			}
 			// Check whitelist
 			for _, prefix := range whitelist {
-				if strings.HasPrefix(r.URL.Path, prefix) {
+				if strings.HasPrefix(path, prefix) {
 					logger.Infof("URI is whitelisted. Accepted without authorization.")
-					returnMessage(w, http.StatusOK, "OK")
+					if verify {
+						w.WriteHeader(http.StatusNoContent)
+					} else {
+						returnMessage(w, http.StatusOK, "OK")
+					}
 					return
 				}
 			}
