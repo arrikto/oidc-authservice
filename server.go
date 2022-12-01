@@ -93,7 +93,40 @@ type httpHeaderOpts struct {
 	authMethodHeader string
 }
 
-func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
+// authenticate_or_login calls initiates the Authorization Code Flow if the user
+// could not be authenticated with one of the available authenticators.
+func (s *server) authenticate_or_login(w http.ResponseWriter, r *http.Request) {
+	s.authenticate(w, r, true)
+	w.WriteHeader(http.StatusOK)
+
+	return
+}
+
+// authenticate_no_login will not initiate the Authorization Code Flow if the
+// user could not be authenticated. This function will return:
+// * HTTP status 200: if the user is authenticated and autheorized
+// * HTTP status 401 or 403: if not
+func (s *server) authenticate_no_login(w http.ResponseWriter, r *http.Request) {
+	s.authenticate(w, r, false)
+	w.WriteHeader(http.StatusNoContent)
+
+	return
+}
+
+// authenticate is the core function of AuthService. It implements the following
+// steps:
+// 1. attempt to authenticate the user who is performing the examined request
+// 2. if the user could not be authenticated and promptLogin is false then
+//    initiate Authorization Code Flow and skip the next steps
+// 3. ensure that the authenticated user is authorized to access the requested
+//    resource, if they are not then deny the access and skip step 4
+// 4. update the headers of the request with the retrieved userInfo and allow the
+//    request
+//
+// We are calling this function from two wrappers:
+// * authenticate_no_login(), this is the handler of the /verify endpoint
+// * authenticate_or_login()
+func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogin bool) {
 
 	logger := loggerForRequest(r, logModuleInfo)
 	logger.Info("Authenticating request...")
@@ -101,8 +134,15 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	// Try each one of the available enabled authenticators, if none of them
 	// achieves to authenticate the request then userInfo will be nil and
 	// Authorization Code Flow will begin.
-	userInfo, authorized := s.tryAuthenticators(w, r)
+	userInfo, authorized := s.tryAuthenticators(w, r, promptLogin)
 	if !authorized {
+		return
+	}
+
+	// Preliminary check for the /verify endpoint
+	// if the user is not authenticated return 401
+	if userInfo == nil && !promptLogin {
+		returnMessage(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -125,15 +165,13 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
 		w.Header().Set(k, v)
 	}
-	w.WriteHeader(http.StatusOK)
-	return
 }
 
 // tryAuthenticators will iterate over the available enabled authenticators.
 // If one of them manages to authenticate the user who is making the requester
 // then it will return their user Info and all the other authenticator will be
 // skipped.
-func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request) (user.Info, bool) {
+func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
 	logger := loggerForRequest(r, logModuleInfo)
 
 	var userInfo user.Info
@@ -186,7 +224,7 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request) (user
 			userInfo = resp.User
 			logger.Infof("UserInfo: %+v", userInfo)
 
-			if s.cacheEnabled && cacheKey != "" {
+			if s.cacheEnabled && cacheKey != "" && !promptLogin {
 				// If cache is enabled and the current
 				// authenticator is Cacheable, store the UserInfo
 				// to cache.

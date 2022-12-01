@@ -50,9 +50,10 @@ func main() {
 	// Register handlers for routes
 	router := mux.NewRouter()
 	router.HandleFunc(c.RedirectURL.Path, s.callback).Methods(http.MethodGet)
+	router.HandleFunc(c.VerifyAuthURL.Path, s.authenticate_no_login).Methods(http.MethodGet)
 	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, SessionLogoutPath), s.logout).Methods(http.MethodPost)
 
-	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate)))
+	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate_or_login)))
 
 	// Start judge server
 	log.Infof("Starting judge server at %v:%v", c.Hostname, c.Port)
