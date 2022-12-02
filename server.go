@@ -155,7 +155,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request) {
 			userInfo = resp.User
 			logger.Infof("UserInfo: %+v", userInfo)
 
-			if cacheKey != "" {
+			if s.cacheEnabled && cacheKey != "" {
 				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
 				logger.Infof("Caching authenticated UserInfo...")
 				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)

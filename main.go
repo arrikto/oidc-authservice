@@ -53,8 +53,8 @@ func main() {
 
 	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate)))
 
-	// Start server
-	log.Infof("Starting server at %v:%v", c.Hostname, c.Port)
+	// Start judge server
+	log.Infof("Starting judge server at %v:%v", c.Hostname, c.Port)
 	stopCh := make(chan struct{})
 	go func(stopCh chan struct{}) {
 		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), handlers.CORS()(router)))
