@@ -545,15 +545,27 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 // live are in the same cluster and requests pass through the AuthService.
 // Allowing the whitelisted requests before OIDC is configured is necessary for
 // the OIDC discovery request to succeed.
-func whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool) func(http.Handler) http.Handler {
+func (s *server) whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool, verify bool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := loggerForRequest(r, logModuleInfo)
+
+			path := r.URL.Path
+			// If called by the `/authservice/verify` router then
+			// first trim the verifyAuthURL prefix and then examine
+			// if the remaining path is whitelisted.
+			if verify {
+				path = strings.TrimPrefix(r.URL.Path, s.verifyAuthURL)
+			}
 			// Check whitelist
 			for _, prefix := range whitelist {
-				if strings.HasPrefix(r.URL.Path, prefix) {
+				if strings.HasPrefix(path, prefix) {
 					logger.Infof("URI is whitelisted. Accepted without authorization.")
-					returnMessage(w, http.StatusOK, "OK")
+					if verify {
+						w.WriteHeader(http.StatusNoContent)
+					} else {
+						returnMessage(w, http.StatusOK, "OK")
+					}
 					return
 				}
 			}
