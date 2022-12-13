@@ -99,6 +99,10 @@ func parseConfig() (*config, error) {
 		log.Fatalf("Unsupported access token authentication configuration:" +
 			"ACCESS_TOKEN_AUTHN=%s",c.AccessTokenAuthn)
 	}
+	if !validSessionStoreType(c.SessionStoreType){
+		log.Fatalf("Unsupported value for the type of the session store:" +
+			"SESSION_STORE_TYPE=%s",c.SessionStoreType)
+	}
 	c.UserTemplateContext = getEnvsFromPrefix("TEMPLATE_CONTEXT_")
 
 	c.SkipAuthURLs = trimSpaceFromStringSliceElements(c.SkipAuthURLs)
@@ -162,6 +166,23 @@ func validAccessTokenAuthn(AccessTokenAuthnEnabledEnv bool, AccessTokenAuthnEnv 
 	log.Info("Please select exactly one of the supported options: " +
 	"i) jwt: to enable the JWT access token authentication method, " +
 	"ii) opaque: to enable the opaque access token authentication method")
+
+	return false
+}
+
+// validSessionStoreType() examines if the admins have configured a valid value
+// for the SESSION_STORE_TYPE envvar.
+func validSessionStoreType(SessionStoreType string) (bool){
+	if SessionStoreType == "boltdb" {
+		return true
+	}
+	if SessionStoreType == "redis"{
+		return true
+	}
+
+	log.Info("Please select exactly one of the options: " +
+	"i) boltdb: to select the BoltDB supported session store, " +
+	"ii) redis: to select the Redis supported session store")
 
 	return false
 }
