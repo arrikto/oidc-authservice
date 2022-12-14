@@ -9,10 +9,12 @@ import (
 )
 
 
-func newRedisSessionStore(addr string, keyPrefix string) (*redisstore.RedisStore, error) {
+func newRedisSessionStore(addr, password, keyPrefix string, db int) (*redisstore.RedisStore, error) {
 
 	client := redis.NewClient(&redis.Options{
 		Addr: addr,
+		Password: password,
+		DB: db,
 	})
 
 	store, err := redisstore.NewRedisStore(context.Background(), client)

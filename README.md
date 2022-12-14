@@ -100,6 +100,8 @@ Session store-related settings:
 | `SESSION_SAME_SITE` | "Lax" | SameSite attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite). Its value can be "None", "Lax" or "Strict". |
 | `SESSION_STORE_TYPE`| "boltdb" | Set `SESSION_STORE_TYPE` to either "boltdb" to use BoltDB as the session store, or "redis" to use redis as the session store. Note that only one of the two can be used, also if you select redis then depending on your redis configurations then you might need to set the password and the number of the database that OIDC-AuthService will use as a [redis-client](https://redis.uptrace.dev/guide/go-redis.html#connecting-to-redis-server).|
 | `SESSION_STORE_REDIS_ADDR`| "127.0.0.1:6379" | Set the `host:port` address for the redis session store. |
+| `SESSION_STORE_REDIS_PASSWORD`| "" | Set the password to connect with the redis session store. |
+| `SESSION_STORE_REDIS_DB`| 0 | Set the number of the database that AuthService should use. If not configured and if the redis session store is selected, then AuthService will use the default redis database. |
 
 By default, the AuthService keeps sessions to check if a user is authenticated. However, there may be times where
 we want to check a user's logged in status at the Provider, effectively making the Provider the one keeping the

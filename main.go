@@ -122,13 +122,13 @@ func main() {
 		defer oidcStateStore.Close()
 	case "redis":
 		// Setup session store
-		store, err = newRedisSessionStore(c.SessionStoreRedisAddr, "")
+		store, err = newRedisSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "", c.SessionStoreRedisDB)
 		if err != nil {
 			log.Fatalf("Error creating session store: %v", err)
 		}
 		defer store.Close()
 		// Setup state store
-		oidcStateStore, err = newRedisSessionStore(c.SessionStoreRedisAddr, "oidc_state:")
+		oidcStateStore, err = newRedisSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "oidc_state:", c.SessionStoreRedisDB)
 		if err != nil {
 			log.Fatalf("Error creating session store: %v", err)
 		}

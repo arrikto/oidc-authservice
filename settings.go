@@ -53,6 +53,8 @@ type config struct {
 	SessionStoreType      string `split_words:"true" default:"boltdb"`
 	SessionStorePath      string `split_words:"true" default:"/var/lib/authservice/data.db"`
 	SessionStoreRedisAddr string `split_words:"true" default:"127.0.0.1:6379"`
+	SessionStoreRedisPWD  string `split_words:"true" default:"" envconfig:"SESSION_STORE_REDIS_PWD"`
+	SessionStoreRedisDB   int    `split_words:"true" default:"0" envconfig:"SESSION_STORE_REDIS_DB"`
 	SessionMaxAge         int    `split_words:"true" default:"86400"`
 	SessionSameSite       string `split_words:"true" default:"Lax"`
 
