@@ -105,37 +105,9 @@ func main() {
 		endpoint.AuthURL = c.OIDCAuthURL.String()
 	}
 
-	var store, oidcStateStore ClosableStore
-	switch c.SessionStoreType {
-	case "boltdb":
-		// Setup session store
-		store, err = newBoltDBSessionStore(c.SessionStorePath, shared.DefaultBucketName, false)
-		if err != nil {
-			log.Fatalf("Error creating session store: %v", err)
-		}
-		defer store.Close()
-		// Setup state store
-		oidcStateStore, err = newBoltDBSessionStore(c.OIDCStateStorePath, "oidc_state", true)
-		if err != nil {
-			log.Fatalf("Error creating oidc state store: %v", err)
-		}
-		defer oidcStateStore.Close()
-	case "redis":
-		// Setup session store
-		store, err = newRedisSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "", c.SessionStoreRedisDB)
-		if err != nil {
-			log.Fatalf("Error creating session store: %v", err)
-		}
-		defer store.Close()
-		// Setup state store
-		oidcStateStore, err = newRedisSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "oidc_state:", c.SessionStoreRedisDB)
-		if err != nil {
-			log.Fatalf("Error creating session store: %v", err)
-		}
-		defer oidcStateStore.Close()
-	default:
-		log.Fatalf("Unsupported session store type: %s", c.SessionStoreType)
-	}
+	// Setup session store and state store using the configured session store
+	// type (BoltDB, or redis)
+	store, oidcStateStore := initiateSessionStores(c)
 
 	// Get Kubernetes authenticator
 	var k8sAuthenticator authenticator.Request
