@@ -16,7 +16,6 @@ import (
 	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
-	"github.com/yosssi/boltstore/shared"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
