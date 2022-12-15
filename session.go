@@ -7,8 +7,9 @@ import (
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -115,16 +116,16 @@ type ClosableStore interface {
 	Close() error
 }
 
-
 // initiateSessionStores initiates both the required stores for the:
 // * users sessions
 // * OIDC states
 // Based on the configured session store (boltdb, or redis) this function will
 // return these two session stores, or will terminate the execution with a fatal
 // log message.
-func initiateSessionStores(c *config) (CloseableStore, CloseAbleStore) {
+func initiateSessionStores(c *config) (CloseableStore, CloseableStore) {
 
 	var store, oidcStateStore ClosableStore
+	var err error
 	switch c.SessionStoreType {
 	case "boltdb":
 		// Setup session store
