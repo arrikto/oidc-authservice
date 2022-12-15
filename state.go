@@ -10,6 +10,9 @@ import (
 
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
+
+	//ATHAMARK:
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -52,6 +55,10 @@ func createState(r *http.Request, w http.ResponseWriter,
 	session.Options.MaxAge = int(20 * time.Minute)
 	session.Options.Path = "/"
 	session.Values[sessionValueState] = *s
+
+	// ATHAMARK
+	logger := logrus.StandardLogger()
+	logger.Infof("ATHAMARK: Session to be saved: %+v", session)
 
 	err = session.Save(r, w)
 	if err != nil {
