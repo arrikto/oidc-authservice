@@ -126,6 +126,7 @@ func initiateSessionStores(c *config) (ClosableStore, ClosableStore) {
 
 	logger := logrus.StandardLogger()
 
+	logger.Infof("Configured session store type: %s", c.SessionStoreType)
 	var store, oidcStateStore ClosableStore
 	var err error
 	switch c.SessionStoreType {
