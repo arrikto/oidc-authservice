@@ -108,6 +108,9 @@ func main() {
 	// type (BoltDB, or redis)
 	store, oidcStateStore := initiateSessionStores(c)
 
+	defer store.Close()
+	defer oidcStateStore.Close()
+
 	// Get Kubernetes authenticator
 	var k8sAuthenticator authenticator.Request
 	restConfig, err := clientconfig.GetConfig()

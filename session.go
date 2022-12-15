@@ -136,26 +136,26 @@ func initiateSessionStores(c *config) (ClosableStore, ClosableStore) {
 		if err != nil {
 			logger.Fatalf("Error creating session store: %v", err)
 		}
-		defer store.Close()
+		//defer store.Close()
 		// Setup state store
 		oidcStateStore, err = newBoltDBSessionStore(c.OIDCStateStorePath, "oidc_state", true)
 		if err != nil {
 			logger.Fatalf("Error creating oidc state store: %v", err)
 		}
-		defer oidcStateStore.Close()
+		//defer oidcStateStore.Close()
 	case "redis":
 		// Setup session store
 		store, err = newRedisSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "", c.SessionStoreRedisDB)
 		if err != nil {
 			logger.Fatalf("Error creating session store: %v", err)
 		}
-		defer store.Close()
+		//defer store.Close()
 		// Setup state store
 		oidcStateStore, err = newRedisSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "oidc_state:", c.SessionStoreRedisDB)
 		if err != nil {
 			logger.Fatalf("Error creating session store: %v", err)
 		}
-		defer oidcStateStore.Close()
+		//defer oidcStateStore.Close()
 	default:
 		logger.Fatalf("Unsupported session store type: %s", c.SessionStoreType)
 	}
