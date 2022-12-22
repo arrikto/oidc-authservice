@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/common"
 	oidc "github.com/coreos/go-oidc"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -18,16 +19,16 @@ type idTokenAuthenticator struct {
 }
 
 func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r, "idtoken authenticator")
+	logger := common.LoggerForRequest(r, "idtoken authenticator")
 
 	// get id-token from header
-	bearer := getBearerToken(r.Header.Get(s.header))
+	bearer := common.GetBearerToken(r.Header.Get(s.header))
 	if len(bearer) == 0 {
 		logger.Info("No bearer token found")
 		return nil, false, nil
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := common.SetTLSContext(r.Context(), s.caBundle)
 
 	// Verifying received ID token
 	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.clientID})
@@ -52,7 +53,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	groups := []string{}
 	groupsClaim := claims[s.groupsClaim]
 	if groupsClaim != nil {
-		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
+		groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
 	// Authentication using header successfully completed

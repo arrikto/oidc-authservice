@@ -10,6 +10,7 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"github.com/arrikto/oidc-authservice/common"
 )
 
 const (
@@ -39,7 +40,7 @@ func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*a
 
 	// If the request contains an expired token, we stop trying and return 403
 	if err != nil && strings.Contains(err.Error(), bearerTokenExpiredMsg) {
-		return nil, false, &loginExpiredError{Err: err}
+		return nil, false, &common.LoginExpiredError{Err: err}
 	}
 
 	if found {
@@ -63,6 +64,6 @@ func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*a
 // The Kubernetes Authenticator implements the Cacheable
 // interface with the getCacheKey().
 func (k8sauth *kubernetesAuthenticator) getCacheKey(r *http.Request) (string) {
-	return getBearerToken(r.Header.Get("Authorization"))
+	return common.GetBearerToken(r.Header.Get("Authorization"))
 
 }

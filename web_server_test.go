@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/arrikto/oidc-authservice/common"
 )
 
 func TestWebServerDefault(t *testing.T) {
@@ -19,10 +21,10 @@ func TestWebServerDefault(t *testing.T) {
 		t.Fatal(s.Start("localhost:8082"))
 	}()
 	time.Sleep(3 * time.Second)
-	baseURL := mustParseURL("http://localhost:8082")
-	homepage := baseURL.ResolveReference(mustParseURL("/site/homepage"))
-	afterLogout := baseURL.ResolveReference(mustParseURL("/site/after_logout"))
-	image := baseURL.ResolveReference(mustParseURL("/site/themes/kubeflow/styles.css"))
+	baseURL := common.MustParseURL("http://localhost:8082")
+	homepage := baseURL.ResolveReference(common.MustParseURL("/site/homepage"))
+	afterLogout := baseURL.ResolveReference(common.MustParseURL("/site/after_logout"))
+	image := baseURL.ResolveReference(common.MustParseURL("/site/themes/kubeflow/styles.css"))
 
 	tests := []struct {
 		name string

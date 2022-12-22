@@ -4,57 +4,6 @@ import (
 	"testing"
 )
 
-func TestValidAccessTokenAuthn(t *testing.T) {
-
-	tests := []struct {
-		testName string
-		AccessTokenAuthnEnabled bool
-		AccessTokenAuthn string
-		success  bool
-	}{
-		{
-			testName: "Access Token Authenticator is set to JWT",
-			AccessTokenAuthnEnabled: true,
-			AccessTokenAuthn: "jwt",
-			success: true,
-		},
-		{
-			testName: "Access Token Authenticator is set to opaque",
-			AccessTokenAuthnEnabled: true,
-			AccessTokenAuthn: "opaque",
-			success: true,
-		},
-		{
-			testName: "Access Token Authenticator is disabled",
-			AccessTokenAuthnEnabled: false,
-			AccessTokenAuthn: "whatever",
-			success: true,
-		},
-		{
-			testName: "Access Token Authenticator envvar is invalid (JWT)",
-			AccessTokenAuthnEnabled: true,
-			AccessTokenAuthn: "JWT",
-			success: false,
-		},
-		{
-			testName: "Access Token Authenticator envvar is invalid (Opaque)",
-			AccessTokenAuthnEnabled: true,
-			AccessTokenAuthn: "Opaque",
-			success: false,
-		},
-	}
-
-	for _, c := range tests {
-		t.Run(c.testName, func(t *testing.T) {
-			result := validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn)
-
-			if result != c.success {
-				t.Errorf("validAccessTokenAuthn result for %v is not the expected one.", c)
-			}
-		})
-	}
-}
-
 func TestRetrieveUserIDGroupsUserInfo(t *testing.T) {
 
 	s := &opaqueTokenAuthenticator {

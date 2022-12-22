@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arrikto/oidc-authservice/common"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	cache "github.com/patrickmn/go-cache"
@@ -25,8 +26,6 @@ const (
 )
 
 var (
-	OIDCCallbackPath      = "/oidc/callback"
-	VerifyEndpoint        = "/verify"
 	SessionLogoutPath     = "/logout"
 	authenticatorsMapping = []string{
 		0: "kubernetes authenticator",
@@ -70,27 +69,11 @@ type server struct {
 	AccessTokenAuthn        string
 
 	authHeader             string
-	idTokenOpts            jwtClaimOpts
-	upstreamHTTPHeaderOpts httpHeaderOpts
-	userIdTransformer      UserIDTransformer
+	idTokenOpts            common.JWTClaimOpts
+	upstreamHTTPHeaderOpts common.HTTPHeaderOpts
+	userIdTransformer      common.UserIDTransformer
 	caBundle               []byte
 	sessionSameSite        http.SameSite
-}
-
-// jwtClaimOpts specifies the location of the user's identity inside a JWT's
-// claims.
-type jwtClaimOpts struct {
-	userIDClaim string
-	groupsClaim string
-}
-
-// httpHeaderOpts specifies the location of the user's identity and
-// authentication method inside HTTP headers.
-type httpHeaderOpts struct {
-	userIDHeader     string
-	userIDPrefix     string
-	groupsHeader     string
-	authMethodHeader string
 }
 
 // authenticate_or_login calls initiates the Authorization Code Flow if the user
@@ -104,7 +87,7 @@ func (s *server) authenticate_or_login(w http.ResponseWriter, r *http.Request) {
 	// The user is successfully authenticated and authorized to perform the
 	// request. Proceed with writing the headers on the response and return
 	// the `200` HTTP status code.
-	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
+	for k, v := range common.UserInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
 		w.Header().Set(k, v)
 	}
 	w.WriteHeader(http.StatusOK)
@@ -124,7 +107,7 @@ func (s *server) authenticate_no_login(w http.ResponseWriter, r *http.Request) {
 	// The user is successfully authenticated and authorized to perform the
 	// request. Proceed with writing the headers on the response and return
 	// the `204` HTTP status code.
-	for k, v := range userInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
+	for k, v := range common.UserInfoToHeaders(userInfo, &s.upstreamHTTPHeaderOpts, &s.userIdTransformer) {
 		w.Header().Set(k, v)
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -146,7 +129,7 @@ func (s *server) authenticate_no_login(w http.ResponseWriter, r *http.Request) {
 // * authenticate_or_login()
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
 
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 	logger.Info("Authenticating request...")
 
 	// Try each one of the available enabled authenticators, if none of them
@@ -157,11 +140,13 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogi
 		return nil, false
 	}
 
+	// Preliminary check for the /verify endpoint
+	// if the user is not authenticated return 401
 	if userInfo == nil {
 		// Preliminary check for the /verify endpoint
 		// if the user is not authenticated return 401
 		if !promptLogin {
-			returnMessage(w, http.StatusUnauthorized, "Unauthorized")
+			common.ReturnMessage(w, http.StatusUnauthorized, "Unauthorized")
 			return nil, false
 		}
 
@@ -188,7 +173,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogi
 // then it will return their user Info and all the other authenticator will be
 // skipped.
 func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	var userInfo user.Info
 	for i, auth := range s.authenticators {
@@ -219,18 +204,18 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promp
 			// If we get a login expired error, it means the
 			// authenticator recognised a valid authentication method
 			// which has expired
-			var expiredErr *loginExpiredError
+			var expiredErr *common.LoginExpiredError
 			if errors.As(err, &expiredErr) {
-				returnMessage(w, http.StatusUnauthorized, expiredErr.Error())
+				common.ReturnMessage(w, http.StatusUnauthorized, expiredErr.Error())
 				return nil, false
 			}
 
 			// If AuthService encountered an authenticator-specific
 			// error, then no other authentication methods will be
 			// tested.
-			var authnError *authenticatorSpecificError
+			var authnError *common.AuthenticatorSpecificError
 			if errors.As(err, &authnError) {
-				returnMessage(w, http.StatusUnauthorized, authnError.Error())
+				common.ReturnMessage(w, http.StatusUnauthorized, authnError.Error())
 				return nil, false
 			}
 
@@ -255,7 +240,7 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promp
 // does not allow the user to make the request then AuthService denies the access
 // to this resource.
 func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo user.Info) bool {
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	for _, authz := range s.authorizers {
 		allowed, reason, err := authz.Authorize(r, userInfo)
@@ -284,7 +269,7 @@ func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo use
 				"Click <a href='%s'> here</a> to login again.", userInfo.GetName(),
 				reason, s.homepageURL)
 
-			returnHTML(w, http.StatusForbidden, msg)
+			common.ReturnHTML(w, http.StatusForbidden, msg)
 			return false
 		}
 	}
@@ -298,7 +283,7 @@ func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo use
 // if there is an entry in the cache for the examined user.
 // Otherwise, it returns nil and an empty string respectively.
 func (s *server) getCachedUser(auth authenticator.Request, r *http.Request) (user.Info, string) {
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	// If the cache is enabled, check if the current authenticator implements the Cacheable interface.
 	cacheable := reflect.TypeOf((*Cacheable)(nil)).Elem()
@@ -328,13 +313,13 @@ func (s *server) getCachedUser(auth authenticator.Request, r *http.Request) (use
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
 func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *http.Request) {
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	// Initiate OIDC Flow with Authorization Request.
 	state, err := createState(r, w, s.oidcStateStore)
 	if err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
+		common.ReturnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
 		return
 	}
 
@@ -344,7 +329,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
 func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	// Get authorization code from authorization response.
 	var authCode = r.FormValue("code")
@@ -360,7 +345,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	var stateID = r.FormValue("state")
 	if len(stateID) == 0 {
 		logger.Error("Missing url parameter: state")
-		returnMessage(w, http.StatusBadRequest, "Missing url parameter: state")
+		common.ReturnMessage(w, http.StatusBadRequest, "Missing url parameter: state")
 		return
 	}
 
@@ -368,25 +353,25 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	state, err := verifyState(r, w, s.oidcStateStore)
 	if err != nil {
 		logger.Errorf("Failed to verify state parameter: %v", err)
-		returnMessage(w, http.StatusBadRequest, "CSRF check failed."+
+		common.ReturnMessage(w, http.StatusBadRequest, "CSRF check failed."+
 			" This may happen if you opened the login form in more than 1"+
 			" tabs. Please try to login again.")
 		return
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := common.SetTLSContext(r.Context(), s.caBundle)
 	// Exchange the authorization code with {access, refresh, id}_token
 	oauth2Tokens, err := s.oauth2Config.Exchange(ctx, authCode)
 	if err != nil {
 		logger.Errorf("Failed to exchange authorization code with token: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
+		common.ReturnMessage(w, http.StatusInternalServerError, "Failed to exchange authorization code with token.")
 		return
 	}
 
 	rawIDToken, ok := oauth2Tokens.Extra("id_token").(string)
 	if !ok {
 		logger.Error("No id_token field available.")
-		returnMessage(w, http.StatusInternalServerError, "No id_token field in OAuth 2.0 token.")
+		common.ReturnMessage(w, http.StatusInternalServerError, "No id_token field in OAuth 2.0 token.")
 		return
 	}
 
@@ -395,7 +380,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	_, err = verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Unable to verify ID token.")
+		common.ReturnMessage(w, http.StatusInternalServerError, "Unable to verify ID token.")
 		return
 	}
 
@@ -404,13 +389,13 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	oidcUserInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
+		common.ReturnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
 		return
 	}
 
 	if err = oidcUserInfo.Claims(&claims); err != nil {
 		logger.Errorf("Problem getting userinfo claims: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
+		common.ReturnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
 		return
 	}
 
@@ -421,18 +406,18 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
 
-	userID, ok := claims[s.idTokenOpts.userIDClaim].(string)
+	userID, ok := claims[s.idTokenOpts.UserIDClaim].(string)
 	if !ok {
-		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.idTokenOpts.userIDClaim, claims)
-		returnMessage(w, http.StatusInternalServerError,
-			fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.idTokenOpts.userIDClaim))
+		logger.Errorf("Couldn't find claim `%s' in claims `%v'", s.idTokenOpts.UserIDClaim, claims)
+		common.ReturnMessage(w, http.StatusInternalServerError,
+			fmt.Sprintf("Couldn't find userID claim in `%s' in userinfo.", s.idTokenOpts.UserIDClaim))
 		return
 	}
 
 	groups := []string{}
-	groupsClaim := claims[s.idTokenOpts.groupsClaim]
+	groupsClaim := claims[s.idTokenOpts.GroupsClaim]
 	if groupsClaim != nil {
-		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
+		groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
 	session.Values[userSessionUserID] = userID
@@ -442,7 +427,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
-		returnMessage(w, http.StatusInternalServerError, "Error creating user session")
+		common.ReturnMessage(w, http.StatusInternalServerError, "Error creating user session")
 		return
 	}
 
@@ -451,7 +436,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	if s.afterLoginRedirectURL != "" {
 		// Redirect to a predefined url from config, add the original url as
 		// `next` query parameter.
-		afterLoginRedirectURL := mustParseURL(s.afterLoginRedirectURL)
+		afterLoginRedirectURL := common.MustParseURL(s.afterLoginRedirectURL)
 		q := afterLoginRedirectURL.Query()
 		q.Set("next", state.FirstVisitedURL)
 		afterLoginRedirectURL.RawQuery = q.Encode()
@@ -487,10 +472,10 @@ func (s *server) enabledAuthenticator(authenticator string) bool {
 // logout is the handler responsible for revoking the user's session.
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
-	logger := loggerForRequest(r, logModuleInfo)
+	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	// Only header auth allowed for this endpoint
-	sessionID := getBearerToken(r.Header.Get(s.authHeader))
+	sessionID := common.GetBearerToken(r.Header.Get(s.authHeader))
 	if sessionID == "" {
 		logger.Errorf("Request doesn't have a session value in header '%s'", s.authHeader)
 		w.WriteHeader(http.StatusUnauthorized)
@@ -516,12 +501,12 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Error revoking tokens: %v", err)
 		statusCode := http.StatusInternalServerError
 		// If the server returned 503, return it as well as the client might want to retry
-		if reqErr, ok := errors.Cause(err).(*requestError); ok {
+		if reqErr, ok := errors.Cause(err).(*common.RequestError); ok {
 			if reqErr.Response.StatusCode == http.StatusServiceUnavailable {
 				statusCode = reqErr.Response.StatusCode
 			}
 		}
-		returnMessage(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
+		common.ReturnMessage(w, statusCode, "Failed to revoke access/refresh tokens, please try again")
 		return
 	}
 
@@ -533,7 +518,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return 201 because the logout endpoint is still on the envoy-facing server,
 	// meaning that returning a 200 will result in the request being proxied upstream.
-	returnJSONMessage(w, http.StatusCreated, resp)
+	common.ReturnJSONMessage(w, http.StatusCreated, resp)
 }
 
 // readiness is the handler that checks if the authservice is ready for serving
@@ -561,7 +546,7 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 func (s *server) whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool, verify bool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := loggerForRequest(r, logModuleInfo)
+			logger := common.LoggerForRequest(r, logModuleInfo)
 
 			path := r.URL.Path
 			// If called by the `/authservice/verify` router then
@@ -577,14 +562,14 @@ func (s *server) whitelistMiddleware(whitelist []string, isReady *abool.AtomicBo
 					if verify {
 						w.WriteHeader(http.StatusNoContent)
 					} else {
-						returnMessage(w, http.StatusOK, "OK")
+						common.ReturnMessage(w, http.StatusOK, "OK")
 					}
 					return
 				}
 			}
 			// If server is not ready, return 503.
 			if !isReady.IsSet() {
-				returnMessage(w, http.StatusServiceUnavailable, "OIDC Setup is not complete yet.")
+				common.ReturnMessage(w, http.StatusServiceUnavailable, "OIDC Setup is not complete yet.")
 				return
 			}
 			// Server ready, continue.

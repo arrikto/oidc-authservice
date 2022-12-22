@@ -1,15 +1,15 @@
 // Copyright (c) 2018 Antti Myyrä
 // Copyright © 2019 Arrikto Inc.  All Rights Reserved.
 
-package main
+package common
 
 import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -22,11 +22,30 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-type Cacheable interface {
-	getCacheKey(r *http.Request) string
+var (
+	AfterLogoutPath  = "/site/after_logout"
+	HomepagePath     = "/site/homepage"
+	OIDCCallbackPath = "/oidc/callback"
+	VerifyEndpoint   = "/verify"
+)
+
+// JWTClaimOpts specifies the location of the user's identity inside a JWT's
+// claims.
+type JWTClaimOpts struct {
+	UserIDClaim string
+	GroupsClaim string
 }
 
-func realpath(path string) (string, error) {
+// HTTPHeaderOpts specifies the location of the user's identity and
+// authentication method inside HTTP headers.
+type HTTPHeaderOpts struct {
+	UserIDHeader     string
+	UserIDPrefix     string
+	GroupsHeader     string
+	AuthMethodHeader string
+}
+
+func RealPath(path string) (string, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
@@ -38,7 +57,7 @@ func realpath(path string) (string, error) {
 	return path, nil
 }
 
-func loggerForRequest(r *http.Request, info string) *log.Entry {
+func LoggerForRequest(r *http.Request, info string) *log.Entry {
 	return log.WithContext(r.Context()).WithFields(log.Fields{
 		"context": info, // include info about the module generating the log
 		"ip":      getUserIP(r),
@@ -55,7 +74,7 @@ func getUserIP(r *http.Request) string {
 	return strings.Split(r.RemoteAddr, ":")[0]
 }
 
-func returnHTML(w http.ResponseWriter, statusCode int, html string) {
+func ReturnHTML(w http.ResponseWriter, statusCode int, html string) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(statusCode)
 	_, err := w.Write([]byte(html))
@@ -64,7 +83,7 @@ func returnHTML(w http.ResponseWriter, statusCode int, html string) {
 	}
 }
 
-func returnMessage(w http.ResponseWriter, statusCode int, msg string) {
+func ReturnMessage(w http.ResponseWriter, statusCode int, msg string) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(statusCode)
 	_, err := w.Write([]byte(msg))
@@ -73,7 +92,7 @@ func returnMessage(w http.ResponseWriter, statusCode int, msg string) {
 	}
 }
 
-func returnJSONMessage(w http.ResponseWriter, statusCode int, jsonMsg interface{}) {
+func ReturnJSONMessage(w http.ResponseWriter, statusCode int, jsonMsg interface{}) {
 	jsonBytes, err := json.Marshal(jsonMsg)
 	if err != nil {
 		log.Errorf("Failed to marshal struct to json: %v", err)
@@ -108,7 +127,7 @@ func createNonce(length int) (string, error) {
 	return string(nonce), nil
 }
 
-func setTLSContext(ctx context.Context, caBundle []byte) context.Context {
+func SetTLSContext(ctx context.Context, caBundle []byte) context.Context {
 	if len(caBundle) == 0 {
 		return ctx
 	}
@@ -127,7 +146,7 @@ func setTLSContext(ctx context.Context, caBundle []byte) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, tlsConf)
 }
 
-func mustParseURL(rawURL string) *url.URL {
+func MustParseURL(rawURL string) *url.URL {
 	url, err := url.Parse(rawURL)
 	if err != nil {
 		panic(err)
@@ -135,13 +154,13 @@ func mustParseURL(rawURL string) *url.URL {
 	return url
 }
 
-func resolvePathReference(u *url.URL, p string) *url.URL {
+func ResolvePathReference(u *url.URL, p string) *url.URL {
 	ret := *u
 	ret.Path = path.Join(ret.Path, p)
 	return &ret
 }
 
-func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
+func DoRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	client := http.DefaultClient
 	if c, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); ok {
 		client = c
@@ -151,7 +170,7 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 	return client.Do(req.WithContext(ctx))
 }
 
-func getBearerToken(value string) string {
+func GetBearerToken(value string) string {
 	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "Bearer ") {
 		return strings.TrimPrefix(value, "Bearer ")
@@ -159,19 +178,19 @@ func getBearerToken(value string) string {
 	return value
 }
 
-func userInfoToHeaders(info user.Info, opts *httpHeaderOpts, transformer *UserIDTransformer) map[string]string {
+func UserInfoToHeaders(info user.Info, opts *HTTPHeaderOpts, transformer *UserIDTransformer) map[string]string {
 	res := map[string]string{}
-	res[opts.userIDHeader] = opts.userIDPrefix + transformer.Transform(info.GetName())
-	res[opts.groupsHeader] = strings.Join(info.GetGroups(), ",")
+	res[opts.UserIDHeader] = opts.UserIDPrefix + transformer.Transform(info.GetName())
+	res[opts.GroupsHeader] = strings.Join(info.GetGroups(), ",")
 	if authMethodArr, ok := info.GetExtra()["auth-method"]; ok {
 		if len(authMethodArr) > 0 && authMethodArr[0] != "" {
-			res[opts.authMethodHeader] = authMethodArr[0]
+			res[opts.AuthMethodHeader] = authMethodArr[0]
 		}
 	}
 	return res
 }
 
-func interfaceSliceToStringSlice(in []interface{}) []string {
+func InterfaceSliceToStringSlice(in []interface{}) []string {
 	if in == nil {
 		return nil
 	}
@@ -189,12 +208,12 @@ func interfaceSliceToStringSlice(in []interface{}) []string {
 // Similarly to the https://github.com/coreos/go-oidc/blob/v3/oidc/oidc.go
 // we introduce a custom UnmarshalJSON function that allows us to
 // handle both types.
-type audience []string
+type Audience []string
 
-func (a *audience) UnmarshalJSON(b []byte) error {
+func (a *Audience) UnmarshalJSON(b []byte) error {
 	var s string
 	if json.Unmarshal(b, &s) == nil {
-		*a = audience{s}
+		*a = Audience{s}
 		return nil
 	}
 	var auds []string
@@ -207,7 +226,7 @@ func (a *audience) UnmarshalJSON(b []byte) error {
 
 // We copy the parseJWT() from: https://github.com/coreos/go-oidc/blob/v3/oidc/verify.go
 // to perform one of the necessary local tests for the JWT authenticator.
-func parseJWT(p string) ([]byte, error) {
+func ParseJWT(p string) ([]byte, error) {
 	parts := strings.Split(p, ".")
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("malformed jwt, expected 3 parts got %d", len(parts))
@@ -223,7 +242,7 @@ func parseJWT(p string) ([]byte, error) {
 // two []string objects. The JWT authenticator uses this function to verify
 // that at least one of the audiences of the examined JWT tokens exists in
 // the list of the audiences that the AuthService accepts.
-func contains(sli []string, ele []string) bool {
+func Contains(sli []string, ele []string) bool {
 	for _, s := range sli {
 		for _, elem := range ele {
 			if s == elem {

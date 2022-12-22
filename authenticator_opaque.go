@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/common"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -20,10 +21,10 @@ type opaqueTokenAuthenticator struct {
 }
 
 func (s *opaqueTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r, "opaque access token authenticator")
+	logger := common.LoggerForRequest(r, "opaque access token authenticator")
 
 	// get id-token from header
-	bearer := getBearerToken(r.Header.Get(s.header))
+	bearer := common.GetBearerToken(r.Header.Get(s.header))
 	if len(bearer) == 0 {
 		logger.Info("No bearer token found")
 		return nil, false, nil
@@ -34,11 +35,11 @@ func (s *opaqueTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authen
 		TokenType: "Bearer",
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := common.SetTLSContext(r.Context(), s.caBundle)
 
 	userInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, opaque))
 	if err != nil {
-		var reqErr *requestError
+		var reqErr *common.RequestError
 		if !errors.As(err, &reqErr) {
 			return nil, false, errors.Wrap(err, "UserInfo request failed unexpectedly")
 		}
@@ -50,12 +51,12 @@ func (s *opaqueTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authen
 	var claims map[string]interface{}
 	if claimErr := userInfo.Claims(&claims); claimErr != nil {
 		logger.Errorf("Retrieving user claims failed: %v", claimErr)
-		return nil, false, &authenticatorSpecificError{Err: claimErr}
+		return nil, false, &common.AuthenticatorSpecificError{Err: claimErr}
 	}
 
 	userID, groups, claimErr := s.retrieveUserIDGroupsClaims(claims)
 	if claimErr != nil {
-		return nil, false, &authenticatorSpecificError{Err: claimErr}
+		return nil, false, &common.AuthenticatorSpecificError{Err: claimErr}
 	}
 
 	// Authentication using header successfully completed
@@ -86,7 +87,7 @@ func (s *opaqueTokenAuthenticator) retrieveUserIDGroupsClaims(claims map[string]
 		return "", []string{}, claimErr
 	}
 
-	groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
+	groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 
 	return claims[s.userIDClaim].(string), groups, nil
 }
@@ -94,6 +95,6 @@ func (s *opaqueTokenAuthenticator) retrieveUserIDGroupsClaims(claims map[string]
 // The Opaque Access Token Authenticator implements the Cacheable
 // interface with the getCacheKey().
 func (s *opaqueTokenAuthenticator) getCacheKey(r *http.Request) (string) {
-	return getBearerToken(r.Header.Get("Authorization"))
+	return common.GetBearerToken(r.Header.Get("Authorization"))
 
 }

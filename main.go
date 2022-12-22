@@ -10,6 +10,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/arrikto/oidc-authservice/common"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -27,7 +28,7 @@ const CacheCleanupInterval = 10
 
 func main() {
 
-	c, err := parseConfig()
+	c, err := common.ParseConfig()
 	if err != nil {
 		log.Fatalf("Failed to parse configuration: %+v", err)
 	}
@@ -67,7 +68,7 @@ func main() {
 		TemplatePaths: c.TemplatePath,
 		ProviderURL:   c.ProviderURL.String(),
 		ClientName:    c.ClientName,
-		ThemeURL:      resolvePathReference(c.ThemesURL, c.Theme).String(),
+		ThemeURL:      common.ResolvePathReference(c.ThemesURL, c.Theme).String(),
 		Frontend:      c.UserTemplateContext,
 	}
 	log.Infof("Starting web server at %v:%v", c.Hostname, c.WebServerPort)
@@ -90,7 +91,7 @@ func main() {
 
 	// OIDC Discovery
 	var provider *oidc.Provider
-	ctx := setTLSContext(context.Background(), caBundle)
+	ctx := common.SetTLSContext(context.Background(), caBundle)
 	for {
 		provider, err = oidc.NewProvider(ctx, c.ProviderURL.String())
 		if err == nil {
@@ -211,15 +212,15 @@ func main() {
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
 		verifyAuthURL:          c.VerifyAuthURL.String(),
-		idTokenOpts: jwtClaimOpts{
-			userIDClaim: c.UserIDClaim,
-			groupsClaim: c.GroupsClaim,
+		idTokenOpts: common.JWTClaimOpts{
+			UserIDClaim: c.UserIDClaim,
+			GroupsClaim: c.GroupsClaim,
 		},
-		upstreamHTTPHeaderOpts: httpHeaderOpts{
-			userIDHeader:     c.UserIDHeader,
-			userIDPrefix:     c.UserIDPrefix,
-			groupsHeader:     c.GroupsHeader,
-			authMethodHeader: c.AuthMethodHeader,
+		upstreamHTTPHeaderOpts: common.HTTPHeaderOpts{
+			UserIDHeader:     c.UserIDHeader,
+			UserIDPrefix:     c.UserIDPrefix,
+			GroupsHeader:     c.GroupsHeader,
+			AuthMethodHeader: c.AuthMethodHeader,
 		},
 		userIdTransformer:       c.UserIDTransformer,
 		sessionMaxAgeSeconds:    c.SessionMaxAge,

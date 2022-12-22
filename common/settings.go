@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"net/url"
@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type config struct {
+type Config struct {
 	// OIDC Provider
 	ProviderURL *url.URL `required:"true" split_words:"true" envconfig:"OIDC_PROVIDER"`
 
@@ -81,25 +81,25 @@ type config struct {
 	ExternalAuthzUrl string   `split_words:"true" default:""`
 }
 
-func parseConfig() (*config, error) {
+func ParseConfig() (*Config, error) {
 
-	var c config
+	var c Config
 	err := envconfig.Process("", &c)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(c.RedirectURL.String()) == 0 {
-		c.RedirectURL = resolvePathReference(c.AuthserviceURLPrefix, OIDCCallbackPath)
+		c.RedirectURL = ResolvePathReference(c.AuthserviceURLPrefix, OIDCCallbackPath)
 	}
 	if len(c.HomepageURL.String()) == 0 {
-		c.HomepageURL = resolvePathReference(c.AuthserviceURLPrefix, HomepagePath)
+		c.HomepageURL = ResolvePathReference(c.AuthserviceURLPrefix, HomepagePath)
 	}
 	if len(c.AfterLogoutURL.String()) == 0 {
-		c.AfterLogoutURL = resolvePathReference(c.AuthserviceURLPrefix, AfterLogoutPath)
+		c.AfterLogoutURL = ResolvePathReference(c.AuthserviceURLPrefix, AfterLogoutPath)
 	}
 	if len(c.VerifyAuthURL.String()) == 0 {
-		c.VerifyAuthURL = resolvePathReference(c.AuthserviceURLPrefix, VerifyEndpoint)
+		c.VerifyAuthURL = ResolvePathReference(c.AuthserviceURLPrefix, VerifyEndpoint)
 	}
 	if !validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn){
 		log.Fatalf("Unsupported access token authentication configuration:" +

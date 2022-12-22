@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/arrikto/oidc-authservice/common"
 	oidc "github.com/coreos/go-oidc"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -26,21 +27,21 @@ type jwtTokenAuthenticator struct {
 }
 
 type jwtLocalChecks struct {
-	Issuer    string   `json:"iss"`
-	Audiences audience `json:"aud"`
+	Issuer    string          `json:"iss"`
+	Audiences common.Audience `json:"aud"`
 }
 
 func (s *jwtTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r, "JWT access token authenticator")
+	logger := common.LoggerForRequest(r, "JWT access token authenticator")
 
 	// Get JWT access token from header
-	bearer := getBearerToken(r.Header.Get(s.header))
+	bearer := common.GetBearerToken(r.Header.Get(s.header))
 	if len(bearer) == 0 {
 		logger.Info("No bearer token found")
 		return nil, false, nil
 	}
 
-	ctx := setTLSContext(r.Context(), s.caBundle)
+	ctx := common.SetTLSContext(r.Context(), s.caBundle)
 
 	// Verifying received JWT token
 	for _, aud := range s.audiences {
@@ -65,19 +66,19 @@ func (s *jwtTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 			// Return the error of the go-oidc ID token verifier.
 			logger.Errorf("JWT-token verification failed: %v", err)
-			return nil, false, &authenticatorSpecificError{Err: err}
+			return nil, false, &common.AuthenticatorSpecificError{Err: err}
 		}
 
 		// Retrieve the USERID_CLAIM and the GROUPS_CLAIM
 		var claims map[string]interface{}
 		if claimErr := token.Claims(&claims); claimErr != nil {
 			logger.Errorf("Retrieving user claims failed: %v", claimErr)
-			return nil, false, &authenticatorSpecificError{Err: claimErr}
+			return nil, false, &common.AuthenticatorSpecificError{Err: claimErr}
 		}
 
 		userID, groups, claimErr := s.retrieveUserIDGroupsClaims(claims)
 		if claimErr != nil {
-			return nil, false, &authenticatorSpecificError{Err: claimErr}
+			return nil, false, &common.AuthenticatorSpecificError{Err: claimErr}
 		}
 
 		// Authentication using header successfully completed
@@ -102,7 +103,7 @@ func (s *jwtTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 func (s *jwtTokenAuthenticator) performLocalChecks(bearer string) (error){
 
 	// Verify that the retrieved Bearer token is a parsable JWT token
-	payload, localErr := parseJWT(bearer)
+	payload, localErr := common.ParseJWT(bearer)
 	if localErr != nil { // Check next authenticator
 		localErr = fmt.Errorf("Could not parse the inspected Bearer token.")
 		return localErr
@@ -123,7 +124,7 @@ func (s *jwtTokenAuthenticator) performLocalChecks(bearer string) (error){
 	}
 
 	// Check audiences
-	if !contains(s.audiences, tokenLocalChecks.Audiences){ // Check next authenticator
+	if !common.Contains(s.audiences, tokenLocalChecks.Audiences){ // Check next authenticator
 		localErr = fmt.Errorf("The retrieved \"aud\" did not match with any of the" +
 					" expected audiences.")
 		return localErr
@@ -149,7 +150,7 @@ func (s *jwtTokenAuthenticator) retrieveUserIDGroupsClaims(claims map[string]int
 			return "", []string{}, claimErr
 		}
 
-		groups = interfaceSliceToStringSlice(groupsClaim.([]interface{}))
+		groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 
 		return claims[s.userIDClaim].(string), groups, nil
 }

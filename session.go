@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
@@ -45,9 +46,9 @@ func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	header string) (*sessions.Session, string, error) {
 
 	var authMethod string
-	logger := loggerForRequest(r, "session authenticator")
+	logger := common.LoggerForRequest(r, "session authenticator")
 	// Try to get session from header
-	sessionID := getBearerToken(r.Header.Get(header))
+	sessionID := common.GetBearerToken(r.Header.Get(header))
 	if sessionID != "" {
 		s, err := sessionFromID(sessionID, store)
 		if err == nil && !s.IsNew {
@@ -100,7 +101,7 @@ func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
 	} else {
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		err := revokeTokens(setTLSContext(ctx, caBundle), _revocationEndpoint,
+		err := revokeTokens(common.SetTLSContext(ctx, caBundle), _revocationEndpoint,
 			&token, oauth2Config.ClientID, oauth2Config.ClientSecret)
 		if err != nil {
 			return errors.Wrap(err, "Error revoking tokens")
@@ -122,7 +123,7 @@ type ClosableStore interface {
 // Based on the configured session store (boltdb, or redis) this function will
 // return these two session stores, or will terminate the execution with a fatal
 // log message.
-func initiateSessionStores(c *config) (ClosableStore, ClosableStore) {
+func initiateSessionStores(c *common.Config) (ClosableStore, ClosableStore) {
 	logger := logrus.StandardLogger()
 
 	var store, oidcStateStore ClosableStore

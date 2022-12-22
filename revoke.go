@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -45,11 +46,11 @@ func revokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.
 		log.Info("Attempting to revoke access token...")
 		err := revokeToken(ctx, revocationEndpoint, token.AccessToken, "access_token", clientID, clientSecret)
 		if err != nil {
-			code := err.(*requestError).Response.StatusCode
+			code := err.(*common.RequestError).Response.StatusCode
 			if code == 400 {
 				bodyMap := make(map[string]string)
 
-				err2 := json.Unmarshal(err.(*requestError).Body, &bodyMap)
+				err2 := json.Unmarshal(err.(*common.RequestError).Body, &bodyMap)
 				if err2 != nil {
 					err2 = errors.Wrap(err2, "Error while attempting to unmarshal the body of the request")
 					full_error := errors.New(err.Error() + err2.Error())
@@ -89,7 +90,7 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 	// See: https://github.com/golang/oauth2/blob/bf48bf16ab8d622ce64ec6ce98d2c98f916b6303/internal/token.go#L204-L215
 	req.SetBasicAuth(clientID, clientSecret)
 
-	resp, err := doRequest(ctx, req)
+	resp, err := common.DoRequest(ctx, req)
 	if err != nil {
 		return errors.Wrap(err, "Error contacting revocation endpoint")
 	}
@@ -100,13 +101,13 @@ func revokeToken(ctx context.Context, revocationEndpoint string, token, tokenTyp
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return &requestError{
+			return &common.RequestError{
 				Response: resp,
 				Body:     body,
 				Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, failed to read body: %v", code, err)),
 			}
 		}
-		return &requestError{
+		return &common.RequestError{
 			Response: resp,
 			Body:     body,
 			Err:      errors.New(fmt.Sprintf("Revocation endpoint returned code %v, server returned: %v", code, body)),

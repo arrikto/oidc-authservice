@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/arrikto/oidc-authservice/common"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
@@ -35,7 +36,7 @@ type sessionAuthenticator struct {
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := loggerForRequest(r, "session authenticator")
+	logger := common.LoggerForRequest(r, "session authenticator")
 
 	// Get session from header or cookie
 	session, authMethod, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
@@ -51,12 +52,12 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 	// User is logged in
 	if sa.strictSessionValidation {
-		ctx := setTLSContext(r.Context(), sa.caBundle)
+		ctx := common.SetTLSContext(r.Context(), sa.caBundle)
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
 		// TokenSource takes care of automatically renewing the access token.
 		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
-			var reqErr *requestError
+			var reqErr *common.RequestError
 			if !errors.As(err, &reqErr) {
 				return nil, false, errors.Wrap(err, "UserInfo request failed unexpectedly")
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/boltdb/bolt"
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/gorilla/sessions"
@@ -40,7 +41,7 @@ func newBoltDBSessionStore(path, bucket string, allowDBReuse bool) (*boltDBSessi
 	// Get realpath if the file already exists
 	_, err := os.Stat(path)
 	if !os.IsNotExist(err) {
-		path, err = realpath(path)
+		path, err = common.RealPath(path)
 		if err != nil {
 			return nil, err
 		}

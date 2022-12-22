@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/arrikto/oidc-authservice/common"
 )
 
 // ExternalAuthorizer is responsible for handling authorization in an external
@@ -48,7 +50,7 @@ type AuthorizationRequestInfo struct {
 
 func (e ExternalAuthorizer) Authorize(r *http.Request, userinfo user.Info) (allowed bool, reason string, err error) {
 	// Collect data and create the AuthorizationRequestBody.
-	logger := loggerForRequest(r, "external authorizer")
+	logger := common.LoggerForRequest(r, "external authorizer")
 	logger = logger.WithField("user", userinfo)
 	authorizationUserInfo := e.getUserInfo(r, userinfo)
 
@@ -82,10 +84,10 @@ func (e ExternalAuthorizer) Authorize(r *http.Request, userinfo user.Info) (allo
 // getUserInfo creates a AuthorizationUserInfo object for the current context.
 func (e ExternalAuthorizer) getUserInfo(r *http.Request, userinfo user.Info) AuthorizationUserInfo {
 	// Parse the JWT token and add get the claims if it exists.
-	bearer := getBearerToken(r.Header.Get("Authorization"))
+	bearer := common.GetBearerToken(r.Header.Get("Authorization"))
 	var parsedJwt map[string]interface{} = nil
 	if bearer != "" {
-		jwt, err := parseJWT(bearer)
+		jwt, err := common.ParseJWT(bearer)
 		if err == nil {
 			// Unmarshal the JSON to the interface.
 			err = json.Unmarshal(jwt, &parsedJwt)
