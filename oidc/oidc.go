@@ -1,17 +1,28 @@
-package main
+package oidc
 
 import (
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
+
+func init() {
+	// Register type for claims.
+	gob.Register(map[string]interface{}{})
+	gob.Register(oauth2.Token{})
+	gob.Register(oidc.IDToken{})
+}
 
 // UserInfo represents the OpenID Connect userinfo claims.
 type UserInfo struct {
@@ -21,6 +32,32 @@ type UserInfo struct {
 	EmailVerified bool   `json:"email_verified"`
 
 	RawClaims []byte
+}
+
+type Provider interface {
+	Claims(v interface{}) error
+	Endpoint() oauth2.Endpoint
+	Verifier(config *oidc.Config) *oidc.IDTokenVerifier
+}
+
+func NewConfig(clientID string) *oidc.Config {
+	return &oidc.Config{ClientID: clientID}
+}
+
+func NewProvider(ctx context.Context, u *url.URL) Provider {
+	var provider Provider
+	var err error
+
+	for {
+		provider, err = oidc.NewProvider(ctx, u.String())
+		if err == nil {
+			break
+		}
+		log.Errorf("OIDC provider setup failed, retrying in 10 seconds: %v", err)
+		time.Sleep(10 * time.Second)
+	}
+
+	return provider
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -79,7 +116,7 @@ func ParseUserInfo(body []byte) (*UserInfo, error){
 // contacting the UserInfo endpoint.
 //
 // [1]: https://github.com/coreos/go-oidc/blob/v2.1.0/oidc.go#L180
-func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth2.TokenSource) (*UserInfo, error) {
+func GetUserInfo(ctx context.Context, provider Provider, tokenSource oauth2.TokenSource) (*UserInfo, error) {
 
 	discoveryClaims := &struct {
 		UserInfoURL string `json:"userinfo_endpoint"`

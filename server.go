@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -11,7 +10,7 @@ import (
 	"time"
 
 	"github.com/arrikto/oidc-authservice/common"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/gorilla/sessions"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -36,15 +35,8 @@ var (
 	}
 )
 
-func init() {
-	// Register type for claims.
-	gob.Register(map[string]interface{}{})
-	gob.Register(oauth2.Token{})
-	gob.Register(oidc.IDToken{})
-}
-
 type server struct {
-	provider                *oidc.Provider
+	provider                oidc.Provider
 	oauth2Config            *oauth2.Config
 	store                   ClosableStore
 	oidcStateStore          ClosableStore
@@ -376,7 +368,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verifying received ID token
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.oauth2Config.ClientID})
+	verifier := s.provider.Verifier(
+		oidc.NewConfig(s.oauth2Config.ClientID))
 	_, err = verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		logger.Errorf("Not able to verify ID token: %v", err)
@@ -386,7 +379,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// UserInfo endpoint to get claims
 	claims := map[string]interface{}{}
-	oidcUserInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
+	oidcUserInfo, err := oidc.GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		common.ReturnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")

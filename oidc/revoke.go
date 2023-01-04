@@ -1,4 +1,4 @@
-package main
+package oidc
 
 import (
 	"context"
@@ -10,15 +10,14 @@ import (
 	"strings"
 
 	"github.com/arrikto/oidc-authservice/common"
-	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
-// revocationEndpoint parses the OIDC Provider claims from the discovery document
+// RevocationEndpoint parses the OIDC Provider claims from the discovery document
 // and tries to find the revocation_endpoint.
-func revocationEndpoint(p *oidc.Provider) (string, error) {
+func RevocationEndpoint(p Provider) (string, error) {
 	claims := struct {
 		RevocationEndpoint string `json:"revocation_endpoint"`
 	}{}
@@ -31,9 +30,9 @@ func revocationEndpoint(p *oidc.Provider) (string, error) {
 	return claims.RevocationEndpoint, nil
 }
 
-// revokeTokens is a helper that takes an oauth2.Token and revokes the access and refresh tokens.
+// RevokeTokens is a helper that takes an oauth2.Token and revokes the access and refresh tokens.
 // If no tokens are found, it succeeds.
-func revokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.Token, clientID, clientSecret string) error {
+func RevokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.Token, clientID, clientSecret string) error {
 	if token.RefreshToken != "" {
 		log.Info("Attempting to revoke refresh token...")
 		err := revokeToken(ctx, revocationEndpoint, token.RefreshToken, "refresh_token", clientID, clientSecret)

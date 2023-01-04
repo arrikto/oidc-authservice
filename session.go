@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/arrikto/oidc-authservice/common"
-	"github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/yosssi/boltstore/shared"
@@ -21,6 +21,11 @@ const (
 	userSessionIDToken      = "idtoken"
 	userSessionOAuth2Tokens = "oauth2tokens"
 )
+
+type ClosableStore interface {
+	sessions.Store
+	Close() error
+}
 
 // sessionFromRequestHeader returns a session which has its key in a header.
 // XXX: Because the session library we use doesn't support getting a session
@@ -90,19 +95,19 @@ func revokeSession(ctx context.Context, w http.ResponseWriter,
 // TODO: In the future, we may want to make this function take a function as
 // input, instead of polluting it with extra arguments.
 func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
-	session *sessions.Session, provider *oidc.Provider,
+	session *sessions.Session, provider oidc.Provider,
 	oauth2Config *oauth2.Config, caBundle []byte) error {
 
 	logger := logrus.StandardLogger()
 
 	// Revoke the session's OAuth tokens
-	_revocationEndpoint, err := revocationEndpoint(provider)
+	_revocationEndpoint, err := oidc.RevocationEndpoint(provider)
 	if err != nil {
 		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
 	} else {
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
-		err := revokeTokens(common.SetTLSContext(ctx, caBundle), _revocationEndpoint,
-			&token, oauth2Config.ClientID, oauth2Config.ClientSecret)
+		err := oidc.RevokeTokens(common.SetTLSContext(ctx, caBundle),
+		    _revocationEndpoint, &token, oauth2Config.ClientID, oauth2Config.ClientSecret)
 		if err != nil {
 			return errors.Wrap(err, "Error revoking tokens")
 		}
@@ -110,11 +115,6 @@ func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	}
 
 	return revokeSession(ctx, w, session)
-}
-
-type ClosableStore interface {
-	sessions.Store
-	Close() error
 }
 
 // initiateSessionStores initiates both the required stores for the:

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 
 	"github.com/arrikto/oidc-authservice/common"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -32,7 +32,7 @@ type sessionAuthenticator struct {
 	oauth2Config *oauth2.Config
 	// provider is the OIDC Provider.
 	// Relevant only when strictSessionValidation is enabled.
-	provider *oidc.Provider
+	provider oidc.Provider
 }
 
 func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
@@ -55,7 +55,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		ctx := common.SetTLSContext(r.Context(), sa.caBundle)
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
 		// TokenSource takes care of automatically renewing the access token.
-		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
+		_, err := oidc.GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
 			var reqErr *common.RequestError
 			if !errors.As(err, &reqErr) {

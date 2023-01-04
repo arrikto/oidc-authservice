@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/arrikto/oidc-authservice/common"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -12,7 +12,7 @@ import (
 type idTokenAuthenticator struct {
 	header      string // header name where id token is stored
 	caBundle    []byte
-	provider    *oidc.Provider
+	provider    oidc.Provider
 	clientID    string // need client id to verify the id token
 	userIDClaim string // retrieve the userid if the claim exists
 	groupsClaim string
@@ -31,7 +31,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	ctx := common.SetTLSContext(r.Context(), s.caBundle)
 
 	// Verifying received ID token
-	verifier := s.provider.Verifier(&oidc.Config{ClientID: s.clientID})
+	verifier := s.provider.Verifier(oidc.NewConfig(s.clientID))
 	token, err := verifier.Verify(ctx, bearer)
 	if err != nil {
 		logger.Errorf("id-token verification failed: %v", err)

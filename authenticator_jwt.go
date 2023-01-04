@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/arrikto/oidc-authservice/common"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -19,7 +19,7 @@ const (
 type jwtTokenAuthenticator struct {
 	header      string // header name where JWT access token is stored
 	caBundle    []byte
-	provider    *oidc.Provider
+	provider    oidc.Provider
 	audiences   []string // need client id to verify the id token
 	issuer		string // need this for the local check
 	userIDClaim string // retrieve the userid if the claim exists
@@ -45,7 +45,7 @@ func (s *jwtTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 	// Verifying received JWT token
 	for _, aud := range s.audiences {
-		verifier := s.provider.Verifier(&oidc.Config{ClientID: aud})
+		verifier := s.provider.Verifier(oidc.NewConfig(aud))
 		token, err := verifier.Verify(ctx, bearer)
 
 		if err != nil {

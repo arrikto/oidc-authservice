@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/arrikto/oidc-authservice/common"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/patrickmn/go-cache"
@@ -90,17 +90,8 @@ func main() {
 	}
 
 	// OIDC Discovery
-	var provider *oidc.Provider
 	ctx := common.SetTLSContext(context.Background(), caBundle)
-	for {
-		provider, err = oidc.NewProvider(ctx, c.ProviderURL.String())
-		if err == nil {
-			break
-		}
-		log.Errorf("OIDC provider setup failed, retrying in 10 seconds: %v", err)
-		time.Sleep(10 * time.Second)
-	}
-
+	provider := oidc.NewProvider(ctx, c.ProviderURL)
 	endpoint := provider.Endpoint()
 	if len(c.OIDCAuthURL.String()) > 0 {
 		endpoint.AuthURL = c.OIDCAuthURL.String()

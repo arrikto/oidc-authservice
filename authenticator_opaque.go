@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/arrikto/oidc-authservice/common"
-	oidc "github.com/coreos/go-oidc"
+	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -14,7 +14,7 @@ import (
 type opaqueTokenAuthenticator struct {
 	header        string // header name where opaque access token is stored
 	caBundle      []byte
-	provider      *oidc.Provider
+	provider      oidc.Provider
 	oauth2Config  *oauth2.Config
 	userIDClaim   string // retrieve the userid claim
 	groupsClaim   string // retrieve the groups claim
@@ -37,7 +37,7 @@ func (s *opaqueTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authen
 
 	ctx := common.SetTLSContext(r.Context(), s.caBundle)
 
-	userInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, opaque))
+	userInfo, err := oidc.GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, opaque))
 	if err != nil {
 		var reqErr *common.RequestError
 		if !errors.As(err, &reqErr) {
