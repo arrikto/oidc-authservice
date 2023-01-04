@@ -1,4 +1,4 @@
-package main
+package authenticators
 
 import (
 	"net/http"
@@ -9,29 +9,29 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-type idTokenAuthenticator struct {
-	header      string // header name where id token is stored
-	caBundle    []byte
-	provider    oidc.Provider
-	clientID    string // need client id to verify the id token
-	userIDClaim string // retrieve the userid if the claim exists
-	groupsClaim string
+type IDTokenAuthenticator struct {
+	Header      string // header name where id token is stored
+	CaBundle    []byte
+	Provider    oidc.Provider
+	ClientID    string // need client id to verify the id token
+	UserIDClaim string // retrieve the userid if the claim exists
+	GroupsClaim string
 }
 
-func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+func (s *IDTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
 	logger := common.LoggerForRequest(r, "idtoken authenticator")
 
 	// get id-token from header
-	bearer := common.GetBearerToken(r.Header.Get(s.header))
+	bearer := common.GetBearerToken(r.Header.Get(s.Header))
 	if len(bearer) == 0 {
 		logger.Info("No bearer token found")
 		return nil, false, nil
 	}
 
-	ctx := common.SetTLSContext(r.Context(), s.caBundle)
+	ctx := common.SetTLSContext(r.Context(), s.CaBundle)
 
 	// Verifying received ID token
-	verifier := s.provider.Verifier(oidc.NewConfig(s.clientID))
+	verifier := s.Provider.Verifier(oidc.NewConfig(s.ClientID))
 	token, err := verifier.Verify(ctx, bearer)
 	if err != nil {
 		logger.Errorf("id-token verification failed: %v", err)
@@ -44,14 +44,14 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 		return nil, false, nil
 	}
 
-	if claims[s.userIDClaim] == nil {
+	if claims[s.UserIDClaim] == nil {
 		// No USERID_CLAIM, pass this authenticator
 		logger.Error("USERID_CLAIM doesn't exist in the id token")
 		return nil, false, nil
 	}
 
 	groups := []string{}
-	groupsClaim := claims[s.groupsClaim]
+	groupsClaim := claims[s.GroupsClaim]
 	if groupsClaim != nil {
 		groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
@@ -61,7 +61,7 @@ func (s *idTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name:   claims[s.userIDClaim].(string),
+			Name:   claims[s.UserIDClaim].(string),
 			Groups: groups,
 			Extra:  extra,
 		},

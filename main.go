@@ -10,6 +10,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/arrikto/oidc-authservice/authenticators"
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/sessions"
@@ -19,7 +20,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -104,7 +104,7 @@ func main() {
 	defer oidcStateStore.Close()
 
 	// Get Kubernetes authenticator
-	var k8sAuthenticator authenticator.Request
+	var k8sAuthenticator authenticators.AuthenticatorRequest
 	restConfig, err := clientconfig.GetConfig()
 	if err != nil && c.KubernetesAuthnEnabled {
 		log.Fatalf("Error getting K8s config: %v", err)
@@ -113,7 +113,8 @@ func main() {
 		log.Debugf("Error getting K8s config: %v. " +
 			"Kubernetes authenticator is disabled, skipping ...", err)
 	} else {
-		k8sAuthenticator, err = newKubernetesAuthenticator(restConfig, c.Audiences)
+		k8sAuthenticator, err = authenticators.NewKubernetesAuthenticator(
+			restConfig, c.Audiences)
 		if err != nil && c.KubernetesAuthnEnabled {
 			log.Fatalf("Error creating K8s authenticator: %v", err)
 		} else if err != nil {
@@ -133,42 +134,42 @@ func main() {
 	}
 
 	// Setup authenticators.
-	sessionAuthenticator := &sessionAuthenticator{
-		store:                   store,
-		cookie:                  sessions.UserSessionCookie,
-		header:                  c.AuthHeader,
-		strictSessionValidation: c.StrictSessionValidation,
-		caBundle:                caBundle,
-		provider:                provider,
-		oauth2Config:            oauth2Config,
+	sessionAuthenticator := &authenticators.SessionAuthenticator{
+		Store:                   store,
+		Cookie:                  sessions.UserSessionCookie,
+		Header:                  c.AuthHeader,
+		StrictSessionValidation: c.StrictSessionValidation,
+		CaBundle:                caBundle,
+		Provider:                provider,
+		Oauth2Config:            oauth2Config,
 	}
 
-	idTokenAuthenticator := &idTokenAuthenticator{
-		header:      c.IDTokenHeader,
-		caBundle:    caBundle,
-		provider:    provider,
-		clientID:    c.ClientID,
-		userIDClaim: c.UserIDClaim,
-		groupsClaim: c.GroupsClaim,
+	idTokenAuthenticator := &authenticators.IDTokenAuthenticator{
+		Header:      c.IDTokenHeader,
+		CaBundle:    caBundle,
+		Provider:    provider,
+		ClientID:    c.ClientID,
+		UserIDClaim: c.UserIDClaim,
+		GroupsClaim: c.GroupsClaim,
 	}
 
-	jwtTokenAuthenticator := &jwtTokenAuthenticator{
-		header:      c.IDTokenHeader,
-		caBundle:    caBundle,
-		provider:    provider,
-		audiences:   c.Audiences,
-		issuer:      c.ProviderURL.String(),
-		userIDClaim: c.UserIDClaim,
-		groupsClaim: c.GroupsClaim,
+	jwtTokenAuthenticator := &authenticators.JWTTokenAuthenticator{
+		Header:      c.IDTokenHeader,
+		CaBundle:    caBundle,
+		Provider:    provider,
+		Audiences:   c.Audiences,
+		Issuer:      c.ProviderURL.String(),
+		UserIDClaim: c.UserIDClaim,
+		GroupsClaim: c.GroupsClaim,
 	}
 
-	opaqueTokenAuthenticator := &opaqueTokenAuthenticator{
-		header:       c.IDTokenHeader,
-		caBundle:     caBundle,
-		provider:     provider,
-		oauth2Config: oauth2Config,
-		userIDClaim:  c.UserIDClaim,
-		groupsClaim:  c.GroupsClaim,
+	opaqueTokenAuthenticator := &authenticators.OpaqueTokenAuthenticator{
+		Header:       c.IDTokenHeader,
+		CaBundle:     caBundle,
+		Provider:     provider,
+		Oauth2Config: oauth2Config,
+		UserIDClaim:  c.UserIDClaim,
+		GroupsClaim:  c.GroupsClaim,
 	}
 
 	// Set the bearerUserInfoCache cache to store
@@ -223,7 +224,7 @@ func main() {
 		AccessTokenAuthn:        c.AccessTokenAuthn,
 		authHeader:              c.AuthHeader,
 		caBundle:                caBundle,
-		authenticators: []authenticator.Request{
+		authenticators: []authenticators.AuthenticatorRequest{
 			k8sAuthenticator,
 			opaqueTokenAuthenticator,
 			jwtTokenAuthenticator,

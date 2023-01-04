@@ -1,4 +1,4 @@
-package main
+package authenticators
 
 import (
 	"net/http"
@@ -17,12 +17,12 @@ const (
 	bearerTokenExpiredMsg = "Token has expired"
 )
 
-type kubernetesAuthenticator struct {
-	audiences     []string
-	authenticator authenticator.Request
+type KubernetesAuthenticator struct {
+	Audiences     []string
+	Authenticator AuthenticatorRequest
 }
 
-func newKubernetesAuthenticator(c *rest.Config, aud []string) (authenticator.Request, error) {
+func NewKubernetesAuthenticator(c *rest.Config, aud []string) (AuthenticatorRequest, error) {
 	config := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:                false,
 		TokenAccessReviewClient:  kubernetes.NewForConfigOrDie(c).AuthenticationV1(),
@@ -30,12 +30,12 @@ func newKubernetesAuthenticator(c *rest.Config, aud []string) (authenticator.Req
 		APIAudiences:             aud,
 	}
 	k8sAuthenticator, _, err := config.New()
-	return &kubernetesAuthenticator{audiences: aud, authenticator: k8sAuthenticator}, err
+	return &KubernetesAuthenticator{Audiences: aud, Authenticator: k8sAuthenticator}, err
 }
 
-func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	resp, found, err := k8sauth.authenticator.AuthenticateRequest(
-		r.WithContext(authenticator.WithAudiences(r.Context(), k8sauth.audiences)),
+func (k8sauth *KubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+	resp, found, err := k8sauth.Authenticator.AuthenticateRequest(
+		r.WithContext(authenticator.WithAudiences(r.Context(), k8sauth.Audiences)),
 	)
 
 	// If the request contains an expired token, we stop trying and return 403
@@ -63,7 +63,7 @@ func (k8sauth *kubernetesAuthenticator) AuthenticateRequest(r *http.Request) (*a
 
 // The Kubernetes Authenticator implements the Cacheable
 // interface with the getCacheKey().
-func (k8sauth *kubernetesAuthenticator) getCacheKey(r *http.Request) (string) {
+func (k8sauth *KubernetesAuthenticator) GetCacheKey(r *http.Request) (string) {
 	return common.GetBearerToken(r.Header.Get("Authorization"))
 
 }

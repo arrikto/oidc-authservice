@@ -1,4 +1,4 @@
-package main
+package authenticators
 
 import (
 	"net/http"
@@ -16,14 +16,14 @@ const (
 	audienceNotfound = "oidc: expected audience"
 )
 
-type jwtTokenAuthenticator struct {
-	header      string // header name where JWT access token is stored
-	caBundle    []byte
-	provider    oidc.Provider
-	audiences   []string // need client id to verify the id token
-	issuer		string // need this for the local check
-	userIDClaim string // retrieve the userid if the claim exists
-	groupsClaim string
+type JWTTokenAuthenticator struct {
+	Header      string // header name where JWT access token is stored
+	CaBundle    []byte
+	Provider    oidc.Provider
+	Audiences   []string // need client id to verify the id token
+	Issuer      string // need this for the local check
+	UserIDClaim string // retrieve the userid if the claim exists
+	GroupsClaim string
 }
 
 type jwtLocalChecks struct {
@@ -31,21 +31,21 @@ type jwtLocalChecks struct {
 	Audiences common.Audience `json:"aud"`
 }
 
-func (s *jwtTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+func (s *JWTTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
 	logger := common.LoggerForRequest(r, "JWT access token authenticator")
 
 	// Get JWT access token from header
-	bearer := common.GetBearerToken(r.Header.Get(s.header))
+	bearer := common.GetBearerToken(r.Header.Get(s.Header))
 	if len(bearer) == 0 {
 		logger.Info("No bearer token found")
 		return nil, false, nil
 	}
 
-	ctx := common.SetTLSContext(r.Context(), s.caBundle)
+	ctx := common.SetTLSContext(r.Context(), s.CaBundle)
 
 	// Verifying received JWT token
-	for _, aud := range s.audiences {
-		verifier := s.provider.Verifier(oidc.NewConfig(aud))
+	for _, aud := range s.Audiences {
+		verifier := s.Provider.Verifier(oidc.NewConfig(aud))
 		token, err := verifier.Verify(ctx, bearer)
 
 		if err != nil {
@@ -99,8 +99,8 @@ func (s *jwtTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 }
 
-// Perform local checks for the issuer and the audiences 
-func (s *jwtTokenAuthenticator) performLocalChecks(bearer string) (error){
+// Perform local checks for the issuer and the audiences
+func (s *JWTTokenAuthenticator) performLocalChecks(bearer string) (error){
 
 	// Verify that the retrieved Bearer token is a parsable JWT token
 	payload, localErr := common.ParseJWT(bearer)
@@ -118,33 +118,33 @@ func (s *jwtTokenAuthenticator) performLocalChecks(bearer string) (error){
 	}
 
 	// Check issuer
-	if tokenLocalChecks.Issuer != s.issuer { // Check next authenticator
+	if tokenLocalChecks.Issuer != s.Issuer { // Check next authenticator
 		localErr = fmt.Errorf("The retrieved \"iss\" did not match the expected one.")
 		return localErr
 	}
 
 	// Check audiences
-	if !common.Contains(s.audiences, tokenLocalChecks.Audiences){ // Check next authenticator
+	if !common.Contains(s.Audiences, tokenLocalChecks.Audiences){ // Check next authenticator
 		localErr = fmt.Errorf("The retrieved \"aud\" did not match with any of the" +
 					" expected audiences.")
 		return localErr
 	}
 
-	// Local checks succeeded. 
+	// Local checks succeeded.
 	return nil
 
 }
 
 // Retrieve the USERID_CLAIM and the GROUPS_CLAIM from the JWT access token
-func (s *jwtTokenAuthenticator) retrieveUserIDGroupsClaims(claims map[string]interface{}) (string, []string, error){
-		
-		if claims[s.userIDClaim] == nil { 
+func (s *JWTTokenAuthenticator) retrieveUserIDGroupsClaims(claims map[string]interface{}) (string, []string, error){
+
+		if claims[s.UserIDClaim] == nil {
 			claimErr := fmt.Errorf("USERID_CLAIM not found in the JWT token")
 			return "", []string{}, claimErr
 		}
 
 		groups := []string{}
-		groupsClaim := claims[s.groupsClaim]
+		groupsClaim := claims[s.GroupsClaim]
 		if groupsClaim == nil {
 			claimErr := fmt.Errorf("GROUPS_CLAIM not found in the JWT token")
 			return "", []string{}, claimErr
@@ -152,5 +152,5 @@ func (s *jwtTokenAuthenticator) retrieveUserIDGroupsClaims(claims map[string]int
 
 		groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 
-		return claims[s.userIDClaim].(string), groups, nil
+		return claims[s.UserIDClaim].(string), groups, nil
 }

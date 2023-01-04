@@ -1,4 +1,4 @@
-package main
+package authenticators
 
 import (
 	"testing"
@@ -7,13 +7,13 @@ import (
 
 func TestPerformLocalChecks(t *testing.T) {
 
-	s := &jwtTokenAuthenticator {
-		audiences: []string{
+	s := &JWTTokenAuthenticator {
+		Audiences: []string{
 					"myaudience1",
 					"myaudience2",
 					"00af7fe8-a019-4859-94af-3d0f4009fed5",
 				   },
-		issuer:	   "https://auth.pingone.eu/e6b1425e-6090-4d29-a961-e760860d932a/as",
+		Issuer:	   "https://auth.pingone.eu/e6b1425e-6090-4d29-a961-e760860d932a/as",
 	}
 
 	tests := []struct {
@@ -61,9 +61,9 @@ func TestPerformLocalChecks(t *testing.T) {
 
 func TestRetrieveUserIDGroupsClaims(t *testing.T) {
 
-	s := &jwtTokenAuthenticator {
-		userIDClaim: "preferred_username",
-		groupsClaim: "groups",
+	s := &JWTTokenAuthenticator {
+		UserIDClaim: "preferred_username",
+		GroupsClaim: "groups",
 	}
 
 	tests := []struct {

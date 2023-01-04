@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arrikto/oidc-authservice/authenticators"
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/arrikto/oidc-authservice/oidc"
 	"github.com/arrikto/oidc-authservice/sessions"
@@ -16,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -41,7 +41,7 @@ type server struct {
 	store                   sessions.ClosableStore
 	oidcStateStore          sessions.ClosableStore
 	bearerUserInfoCache     *cache.Cache
-	authenticators          []authenticator.Request
+	authenticators          []authenticators.AuthenticatorRequest
 	authorizers             []Authorizer
 	afterLoginRedirectURL   string
 	homepageURL             string
@@ -273,20 +273,20 @@ func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo use
 // * the UserInfo
 // * the cacheKey
 // if there is an entry in the cache for the examined user.
-// Otherwise, it returns nil and an empty string respectively.
-func (s *server) getCachedUser(auth authenticator.Request, r *http.Request) (user.Info, string) {
+// Otherwise, it returns an empty string for the cacheKey and nil respectively.
+func (s *server) getCachedUser(auth authenticators.AuthenticatorRequest, r *http.Request) (user.Info, string) {
 	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	// If the cache is enabled, check if the current authenticator implements the Cacheable interface.
-	cacheable := reflect.TypeOf((*Cacheable)(nil)).Elem()
+	cacheable := reflect.TypeOf((*authenticators.Cacheable)(nil)).Elem()
 	isCacheable := reflect.TypeOf(auth).Implements(cacheable)
 
 	if isCacheable {
 		// Store the key that we are going to use for caching UserDetails.
 		// We store it before the authentication, because the authenticators may mutate the request object.
 		logger.Debugf("Retrieving the cache key...")
-		cacheableAuthenticator := reflect.ValueOf(auth).Interface().(Cacheable)
-		cacheKey := cacheableAuthenticator.getCacheKey(r)
+		cacheableAuthenticator := reflect.ValueOf(auth).Interface().(authenticators.Cacheable)
+		cacheKey := cacheableAuthenticator.GetCacheKey(r)
 
 		if cacheKey != "" {
 			cachedUserInfo, found := s.bearerUserInfoCache.Get(cacheKey)

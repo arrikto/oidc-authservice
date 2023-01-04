@@ -1,4 +1,4 @@
-package main
+package authenticators
 
 import (
 	"testing"
@@ -6,9 +6,9 @@ import (
 
 func TestRetrieveUserIDGroupsUserInfo(t *testing.T) {
 
-	s := &opaqueTokenAuthenticator {
-		userIDClaim: "preferred_username",
-		groupsClaim: "groups",
+	s := &OpaqueTokenAuthenticator {
+		UserIDClaim: "preferred_username",
+		GroupsClaim: "groups",
 	}
 
 	tests := []struct {

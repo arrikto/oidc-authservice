@@ -1,4 +1,4 @@
-package main
+package authenticators
 
 import (
 	"net/http"
@@ -13,33 +13,33 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-type sessionAuthenticator struct {
+type SessionAuthenticator struct {
 	// store is the session store.
-	store sessions.Store
+	Store sessions.Store
 	// cookie is the name of the cookie that holds the session value.
-	cookie string
+	Cookie string
 	// header is the header to check as an alternative to finding the session
 	// value.
-	header string
+	Header string
 	// strictSessionValidation mode checks the validity of the access token
 	// connected with the session on every request.
-	strictSessionValidation bool
+	StrictSessionValidation bool
 	// caBundle specifies CAs to trust when talking with the OIDC Provider.
 	// Relevant only when strictSessionValidation is enabled.
-	caBundle []byte
+	CaBundle []byte
 	// oauth2Config is the config to use when talking with the OIDC Provider.
 	// Relevant only when strictSessionValidation is enabled.
-	oauth2Config *oauth2.Config
+	Oauth2Config *oauth2.Config
 	// provider is the OIDC Provider.
 	// Relevant only when strictSessionValidation is enabled.
-	provider oidc.Provider
+	Provider oidc.Provider
 }
 
-func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
+func (sa *SessionAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
 	logger := common.LoggerForRequest(r, "session authenticator")
 
 	// Get session from header or cookie
-	session, authMethod, err := sessions.SessionFromRequest(r, sa.store, sa.cookie, sa.header)
+	session, authMethod, err := sessions.SessionFromRequest(r, sa.Store, sa.Cookie, sa.Header)
 
 	// Check if user session is valid
 	if err != nil {
@@ -51,11 +51,11 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	}
 
 	// User is logged in
-	if sa.strictSessionValidation {
-		ctx := common.SetTLSContext(r.Context(), sa.caBundle)
+	if sa.StrictSessionValidation {
+		ctx := common.SetTLSContext(r.Context(), sa.CaBundle)
 		token := session.Values[sessions.UserSessionOAuth2Tokens].(oauth2.Token)
 		// TokenSource takes care of automatically renewing the access token.
-		_, err := oidc.GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
+		_, err := oidc.GetUserInfo(ctx, sa.Provider, sa.Oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
 			var reqErr *common.RequestError
 			if !errors.As(err, &reqErr) {
@@ -71,7 +71,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			// means that the cookie will remain at the user's browser but it
 			// will be replaced after the user logs in again.
 			err = sessions.RevokeOIDCSession(ctx, httptest.NewRecorder(), session,
-				sa.provider, sa.oauth2Config, sa.caBundle)
+				sa.Provider, sa.Oauth2Config, sa.CaBundle)
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
 			}
