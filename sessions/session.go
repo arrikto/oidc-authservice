@@ -1,4 +1,4 @@
-package main
+package sessions
 
 import (
 	"context"
@@ -14,40 +14,49 @@ import (
 )
 
 const (
-	userSessionCookie       = "authservice_session"
-	userSessionUserID       = "userid"
-	userSessionGroups       = "groups"
-	userSessionClaims       = "claims"
-	userSessionIDToken      = "idtoken"
-	userSessionOAuth2Tokens = "oauth2tokens"
+	// Issue: https://github.com/gorilla/sessions/issues/200
+	secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
+
+	UserSessionCookie       = "authservice_session"
+	UserSessionUserID       = "userid"
+	UserSessionGroups       = "groups"
+	UserSessionClaims       = "claims"
+	UserSessionIDToken      = "idtoken"
+	UserSessionOAuth2Tokens = "oauth2tokens"
 )
+
+type Store sessions.Store
 
 type ClosableStore interface {
 	sessions.Store
 	Close() error
 }
 
-// sessionFromRequestHeader returns a session which has its key in a header.
+func NewSession(store Store, name string) *sessions.Session{
+	return sessions.NewSession(store, name)
+}
+
+// SessionFromID returns a session which has its key in a header.
 // XXX: Because the session library we use doesn't support getting a session
 // by key, we need to fake a cookie
-func sessionFromID(id string, store sessions.Store) (*sessions.Session, error) {
+func SessionFromID(id string, store sessions.Store) (*sessions.Session, error) {
 	r := &http.Request{Header: make(http.Header)}
 	r.AddCookie(&http.Cookie{
 		// XXX: This is needed because the sessions lib we use also encodes
 		// cookies with securecookie, which requires passing the correct cookie
 		// name during decryption.
-		Name:   userSessionCookie,
+		Name:   UserSessionCookie,
 		Value:  id,
 		Path:   "/",
 		MaxAge: 1,
 	})
-	return store.Get(r, userSessionCookie)
+	return store.Get(r, UserSessionCookie)
 }
 
-// sessionFromRequest looks for a session id in a header and a cookie, in that
+// SessionFromRequest looks for a session id in a header and a cookie, in that
 // order. If it doesn't find a valid session in the header, it will then check
 // the cookie.
-func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
+func SessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	header string) (*sessions.Session, string, error) {
 
 	var authMethod string
@@ -55,7 +64,7 @@ func sessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	// Try to get session from header
 	sessionID := common.GetBearerToken(r.Header.Get(header))
 	if sessionID != "" {
-		s, err := sessionFromID(sessionID, store)
+		s, err := SessionFromID(sessionID, store)
 		if err == nil && !s.IsNew {
 			logger.Infof("Loading session from header %s", header)
 			// Authentication using header successfully completed
@@ -90,11 +99,11 @@ func revokeSession(ctx context.Context, w http.ResponseWriter,
 	return nil
 }
 
-// revokeOIDCSession revokes the given session, which is assumed to be an OIDC
+// RevokeOIDCSession revokes the given session, which is assumed to be an OIDC
 // session, for which it also performs the necessary cleanup.
 // TODO: In the future, we may want to make this function take a function as
 // input, instead of polluting it with extra arguments.
-func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
+func RevokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	session *sessions.Session, provider oidc.Provider,
 	oauth2Config *oauth2.Config, caBundle []byte) error {
 
@@ -105,25 +114,25 @@ func revokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	if err != nil {
 		logger.Warnf("Error getting provider's revocation_endpoint: %v", err)
 	} else {
-		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
+		token := session.Values[UserSessionOAuth2Tokens].(oauth2.Token)
 		err := oidc.RevokeTokens(common.SetTLSContext(ctx, caBundle),
 		    _revocationEndpoint, &token, oauth2Config.ClientID, oauth2Config.ClientSecret)
 		if err != nil {
 			return errors.Wrap(err, "Error revoking tokens")
 		}
-		logger.WithField("userid", session.Values[userSessionUserID].(string)).Info("Access/Refresh tokens revoked")
+		logger.WithField("userid", session.Values[UserSessionUserID].(string)).Info("Access/Refresh tokens revoked")
 	}
 
 	return revokeSession(ctx, w, session)
 }
 
-// initiateSessionStores initiates both the required stores for the:
+// InitiateSessionStores initiates both the required stores for the:
 // * users sessions
 // * OIDC states
 // Based on the configured session store (boltdb, or redis) this function will
 // return these two session stores, or will terminate the execution with a fatal
 // log message.
-func initiateSessionStores(c *common.Config) (ClosableStore, ClosableStore) {
+func InitiateSessionStores(c *common.Config) (ClosableStore, ClosableStore) {
 	logger := logrus.StandardLogger()
 
 	var store, oidcStateStore ClosableStore

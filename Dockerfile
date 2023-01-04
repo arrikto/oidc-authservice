@@ -13,6 +13,7 @@ RUN go mod download
 COPY *.go ./
 COPY common common
 COPY oidc oidc
+COPY sessions sessions
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /go/bin/oidc-authservice
 
 

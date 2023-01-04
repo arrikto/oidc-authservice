@@ -12,6 +12,7 @@ import (
 
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/arrikto/oidc-authservice/oidc"
+	"github.com/arrikto/oidc-authservice/sessions"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/patrickmn/go-cache"
@@ -22,8 +23,6 @@ import (
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-// Issue: https://github.com/gorilla/sessions/issues/200
-const secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
 const CacheCleanupInterval = 10
 
 func main() {
@@ -99,7 +98,7 @@ func main() {
 
 	// Setup session store and state store using the configured session store
 	// type (BoltDB, or redis)
-	store, oidcStateStore := initiateSessionStores(c)
+	store, oidcStateStore := sessions.InitiateSessionStores(c)
 
 	defer store.Close()
 	defer oidcStateStore.Close()
@@ -136,7 +135,7 @@ func main() {
 	// Setup authenticators.
 	sessionAuthenticator := &sessionAuthenticator{
 		store:                   store,
-		cookie:                  userSessionCookie,
+		cookie:                  sessions.UserSessionCookie,
 		header:                  c.AuthHeader,
 		strictSessionValidation: c.StrictSessionValidation,
 		caBundle:                caBundle,

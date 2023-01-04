@@ -1,6 +1,6 @@
 // Copyright © 2019 Arrikto Inc.  All Rights Reserved.
 
-package main
+package sessions
 
 import (
 	"encoding/gob"
@@ -33,11 +33,11 @@ func newState(firstVisitedURL string) *State {
 	}
 }
 
-// createState creates the state parameter from the incoming request, stores
+// CreateState creates the state parameter from the incoming request, stores
 // it in the session store and sets a cookie with the session key.
 // It returns the session key, which can be used as the state value to start
 // an OIDC authentication request.
-func createState(r *http.Request, w http.ResponseWriter,
+func CreateState(r *http.Request, w http.ResponseWriter,
 	store sessions.Store) (string, error) {
 
 	firstVisitedURL, err := url.Parse("")
@@ -68,7 +68,7 @@ func createState(r *http.Request, w http.ResponseWriter,
 	return c.Value, nil
 }
 
-// verifyState gets the state from the cookie 'initState' saved. It also gets
+// VerifyState gets the state from the cookie 'initState' saved. It also gets
 // the state from an http param and:
 // 1. Confirms the two values match (CSRF check).
 // 2. Confirms the value is still valid by retrieving the session it points to.
@@ -77,7 +77,7 @@ func createState(r *http.Request, w http.ResponseWriter,
 //
 // Finally, it returns a State struct, which contains information associated
 // with the particular OIDC flow.
-func verifyState(r *http.Request, w http.ResponseWriter,
+func VerifyState(r *http.Request, w http.ResponseWriter,
 	store sessions.Store) (*State, error) {
 
 	// Get the state from the HTTP param.

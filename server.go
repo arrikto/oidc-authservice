@@ -11,7 +11,7 @@ import (
 
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/arrikto/oidc-authservice/oidc"
-	"github.com/gorilla/sessions"
+	"github.com/arrikto/oidc-authservice/sessions"
 	cache "github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
@@ -38,8 +38,8 @@ var (
 type server struct {
 	provider                oidc.Provider
 	oauth2Config            *oauth2.Config
-	store                   ClosableStore
-	oidcStateStore          ClosableStore
+	store                   sessions.ClosableStore
+	oidcStateStore          sessions.ClosableStore
 	bearerUserInfoCache     *cache.Cache
 	authenticators          []authenticator.Request
 	authorizers             []Authorizer
@@ -246,12 +246,12 @@ func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo use
 		// the session authenticator.
 		if !allowed {
 			logger.Infof("Authorizer '%T' denied the request with reason: '%s'", authz, reason)
-			session, _, err := sessionFromRequest(r, s.store, userSessionCookie, s.authHeader)
+			session, _, err := sessions.SessionFromRequest(r, s.store, sessions.UserSessionCookie, s.authHeader)
 			if err != nil {
 				logger.Errorf("Error getting session for request: %v", err)
 			}
 			if !session.IsNew {
-				err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+				err = sessions.RevokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
 				if err != nil {
 					logger.Errorf("Failed to revoke session after authorization fail: %v", err)
 				}
@@ -308,7 +308,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 	logger := common.LoggerForRequest(r, logModuleInfo)
 
 	// Initiate OIDC Flow with Authorization Request.
-	state, err := createState(r, w, s.oidcStateStore)
+	state, err := sessions.CreateState(r, w, s.oidcStateStore)
 	if err != nil {
 		logger.Errorf("Failed to save state in store: %v", err)
 		common.ReturnMessage(w, http.StatusInternalServerError, "Failed to save state in store.")
@@ -342,7 +342,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If state is loaded, then it's correct, as it is saved by its id.
-	state, err := verifyState(r, w, s.oidcStateStore)
+	state, err := sessions.VerifyState(r, w, s.oidcStateStore)
 	if err != nil {
 		logger.Errorf("Failed to verify state parameter: %v", err)
 		common.ReturnMessage(w, http.StatusBadRequest, "CSRF check failed."+
@@ -393,7 +393,7 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// User is authenticated, create new session.
-	session := sessions.NewSession(s.store, userSessionCookie)
+	session := sessions.NewSession(s.store, sessions.UserSessionCookie)
 	session.Options.MaxAge = s.sessionMaxAgeSeconds
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
@@ -413,11 +413,11 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 		groups = common.InterfaceSliceToStringSlice(groupsClaim.([]interface{}))
 	}
 
-	session.Values[userSessionUserID] = userID
-	session.Values[userSessionGroups] = groups
-	session.Values[userSessionClaims] = claims
-	session.Values[userSessionIDToken] = rawIDToken
-	session.Values[userSessionOAuth2Tokens] = oauth2Tokens
+	session.Values[sessions.UserSessionUserID] = userID
+	session.Values[sessions.UserSessionGroups] = groups
+	session.Values[sessions.UserSessionClaims] = claims
+	session.Values[sessions.UserSessionIDToken] = rawIDToken
+	session.Values[sessions.UserSessionOAuth2Tokens] = oauth2Tokens
 	if err := session.Save(r, w); err != nil {
 		logger.Errorf("Couldn't create user session: %v", err)
 		common.ReturnMessage(w, http.StatusInternalServerError, "Error creating user session")
@@ -476,7 +476,7 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Revoke user session.
-	session, err := sessionFromID(sessionID, s.store)
+	session, err := sessions.SessionFromID(sessionID, s.store)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -487,9 +487,9 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	logger = logger.WithField("userid", session.Values[userSessionUserID].(string))
+	logger = logger.WithField("userid", session.Values[sessions.UserSessionUserID].(string))
 
-	err = revokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
+	err = sessions.RevokeOIDCSession(r.Context(), w, session, s.provider, s.oauth2Config, s.caBundle)
 	if err != nil {
 		logger.Errorf("Error revoking tokens: %v", err)
 		statusCode := http.StatusInternalServerError

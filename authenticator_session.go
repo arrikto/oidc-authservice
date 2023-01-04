@@ -6,7 +6,7 @@ import (
 
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/arrikto/oidc-authservice/oidc"
-	"github.com/gorilla/sessions"
+	"github.com/arrikto/oidc-authservice/sessions"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -39,7 +39,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	logger := common.LoggerForRequest(r, "session authenticator")
 
 	// Get session from header or cookie
-	session, authMethod, err := sessionFromRequest(r, sa.store, sa.cookie, sa.header)
+	session, authMethod, err := sessions.SessionFromRequest(r, sa.store, sa.cookie, sa.header)
 
 	// Check if user session is valid
 	if err != nil {
@@ -53,7 +53,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	// User is logged in
 	if sa.strictSessionValidation {
 		ctx := common.SetTLSContext(r.Context(), sa.caBundle)
-		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
+		token := session.Values[sessions.UserSessionOAuth2Tokens].(oauth2.Token)
 		// TokenSource takes care of automatically renewing the access token.
 		_, err := oidc.GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
 		if err != nil {
@@ -70,7 +70,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 			// access to the ResponseWriter and thus can't set a cookie. This
 			// means that the cookie will remain at the user's browser but it
 			// will be replaced after the user logs in again.
-			err = revokeOIDCSession(ctx, httptest.NewRecorder(), session,
+			err = sessions.RevokeOIDCSession(ctx, httptest.NewRecorder(), session,
 				sa.provider, sa.oauth2Config, sa.caBundle)
 			if err != nil {
 				logger.Errorf("Failed to revoke tokens: %v", err)
@@ -82,7 +82,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 	// Data written at a previous version might not have groups stored, so
 	// default to an empty list of strings.
 	// TODO: Consolidate all session serialization/deserialization in one place.
-	groups, ok := session.Values[userSessionGroups].([]string)
+	groups, ok := session.Values[sessions.UserSessionGroups].([]string)
 	if !ok {
 		groups = []string{}
 	}
@@ -91,7 +91,7 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 
 	resp := &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name:   session.Values[userSessionUserID].(string),
+			Name:   session.Values[sessions.UserSessionUserID].(string),
 			Groups: groups,
 			Extra:  extra,
 		},
