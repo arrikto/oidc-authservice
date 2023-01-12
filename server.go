@@ -121,7 +121,7 @@ func (s *server) authenticate_no_login(w http.ResponseWriter, r *http.Request) {
 // * authenticate_or_login()
 func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
 
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 	logger.Info("Authenticating request...")
 
 	// Try each one of the available enabled authenticators, if none of them
@@ -165,7 +165,7 @@ func (s *server) authenticate(w http.ResponseWriter, r *http.Request, promptLogi
 // then it will return their user Info and all the other authenticator will be
 // skipped.
 func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promptLogin bool) (user.Info, bool) {
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 
 	var userInfo user.Info
 	for i, auth := range s.authenticators {
@@ -232,7 +232,7 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promp
 // does not allow the user to make the request then AuthService denies the access
 // to this resource.
 func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo user.Info) bool {
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 
 	for _, authz := range s.authorizers {
 		allowed, reason, err := authz.Authorize(r, userInfo)
@@ -275,7 +275,7 @@ func (s *server) authorized(w http.ResponseWriter, r *http.Request, userInfo use
 // if there is an entry in the cache for the examined user.
 // Otherwise, it returns an empty string for the cacheKey and nil respectively.
 func (s *server) getCachedUser(auth authenticators.AuthenticatorRequest, r *http.Request) (user.Info, string) {
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 
 	// If the cache is enabled, check if the current authenticator implements the Cacheable interface.
 	cacheable := reflect.TypeOf((*authenticators.Cacheable)(nil)).Elem()
@@ -305,7 +305,7 @@ func (s *server) getCachedUser(auth authenticators.AuthenticatorRequest, r *http
 
 // authCodeFlowAuthenticationRequest initiates an OIDC Authorization Code flow
 func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *http.Request) {
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 
 	// Initiate OIDC Flow with Authorization Request.
 	state, err := sessions.CreateState(r, w, s.oidcStateStore)
@@ -321,7 +321,7 @@ func (s *server) authCodeFlowAuthenticationRequest(w http.ResponseWriter, r *htt
 // callback is the handler responsible for exchanging the auth_code and retrieving an id_token.
 func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 
 	// Get authorization code from authorization response.
 	var authCode = r.FormValue("code")
@@ -465,7 +465,7 @@ func (s *server) enabledAuthenticator(authenticator string) bool {
 // logout is the handler responsible for revoking the user's session.
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
-	logger := common.LoggerForRequest(r, logModuleInfo)
+	logger := common.RequestLogger(r, logModuleInfo)
 
 	// Only header auth allowed for this endpoint
 	sessionID := common.GetBearerToken(r.Header.Get(s.authHeader))
@@ -539,7 +539,7 @@ func readiness(isReady *abool.AtomicBool) http.HandlerFunc {
 func (s *server) whitelistMiddleware(whitelist []string, isReady *abool.AtomicBool, verify bool) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := common.LoggerForRequest(r, logModuleInfo)
+			logger := common.RequestLogger(r, logModuleInfo)
 
 			path := r.URL.Path
 			// If called by the `/authservice/verify` router then

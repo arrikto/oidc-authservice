@@ -19,7 +19,7 @@ type IDTokenAuthenticator struct {
 }
 
 func (s *IDTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := common.LoggerForRequest(r, "idtoken authenticator")
+	logger := common.RequestLogger(r, "idtoken authenticator")
 
 	// get id-token from header
 	bearer := common.GetBearerToken(r.Header.Get(s.Header))

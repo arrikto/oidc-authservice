@@ -21,7 +21,7 @@ type OpaqueTokenAuthenticator struct {
 }
 
 func (s *OpaqueTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := common.LoggerForRequest(r, "opaque access token authenticator")
+	logger := common.RequestLogger(r, "opaque access token authenticator")
 
 	// get id-token from header
 	bearer := common.GetBearerToken(r.Header.Get(s.Header))

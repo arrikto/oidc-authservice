@@ -13,7 +13,6 @@ import (
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -45,6 +44,8 @@ func NewConfig(clientID string) *oidc.Config {
 }
 
 func NewProvider(ctx context.Context, u *url.URL) Provider {
+	log := common.StandardLogger()
+
 	var provider Provider
 	var err error
 

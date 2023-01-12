@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/pkg/errors"
 	"github.com/yosssi/boltstore/shared"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -60,7 +59,7 @@ func SessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	header string) (*sessions.Session, string, error) {
 
 	var authMethod string
-	logger := common.LoggerForRequest(r, "session authenticator")
+	logger := common.RequestLogger(r, "session authenticator")
 	// Try to get session from header
 	sessionID := common.GetBearerToken(r.Header.Get(header))
 	if sessionID != "" {
@@ -107,7 +106,7 @@ func RevokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	session *sessions.Session, provider oidc.Provider,
 	oauth2Config *oauth2.Config, caBundle []byte) error {
 
-	logger := logrus.StandardLogger()
+	logger := common.StandardLogger()
 
 	// Revoke the session's OAuth tokens
 	_revocationEndpoint, err := oidc.RevocationEndpoint(provider)
@@ -133,7 +132,7 @@ func RevokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 // return these two session stores, or will terminate the execution with a fatal
 // log message.
 func InitiateSessionStores(c *common.Config) (ClosableStore, ClosableStore) {
-	logger := logrus.StandardLogger()
+	logger := common.StandardLogger()
 
 	var store, oidcStateStore ClosableStore
 	var err error

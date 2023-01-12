@@ -11,7 +11,6 @@ import (
 
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -33,6 +32,8 @@ func RevocationEndpoint(p Provider) (string, error) {
 // RevokeTokens is a helper that takes an oauth2.Token and revokes the access and refresh tokens.
 // If no tokens are found, it succeeds.
 func RevokeTokens(ctx context.Context, revocationEndpoint string, token *oauth2.Token, clientID, clientSecret string) error {
+	log := common.StandardLogger()
+
 	if token.RefreshToken != "" {
 		log.Info("Attempting to revoke refresh token...")
 		err := revokeToken(ctx, revocationEndpoint, token.RefreshToken, "refresh_token", clientID, clientSecret)

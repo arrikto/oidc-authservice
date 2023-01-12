@@ -57,12 +57,16 @@ func RealPath(path string) (string, error) {
 	return path, nil
 }
 
-func LoggerForRequest(r *http.Request, info string) *log.Entry {
+func RequestLogger(r *http.Request, info string) *log.Entry {
 	return log.WithContext(r.Context()).WithFields(log.Fields{
 		"context": info, // include info about the module generating the log
 		"ip":      getUserIP(r),
 		"request": r.URL.String(),
 	})
+}
+
+func StandardLogger() *log.Logger {
+	return log.StandardLogger()
 }
 
 func getUserIP(r *http.Request) string {

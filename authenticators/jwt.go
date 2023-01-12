@@ -32,7 +32,7 @@ type jwtLocalChecks struct {
 }
 
 func (s *JWTTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authenticator.Response, bool, error) {
-	logger := common.LoggerForRequest(r, "JWT access token authenticator")
+	logger := common.RequestLogger(r, "JWT access token authenticator")
 
 	// Get JWT access token from header
 	bearer := common.GetBearerToken(r.Header.Get(s.Header))

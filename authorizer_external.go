@@ -50,7 +50,7 @@ type AuthorizationRequestInfo struct {
 
 func (e ExternalAuthorizer) Authorize(r *http.Request, userinfo user.Info) (allowed bool, reason string, err error) {
 	// Collect data and create the AuthorizationRequestBody.
-	logger := common.LoggerForRequest(r, "external authorizer")
+	logger := common.RequestLogger(r, "external authorizer")
 	logger = logger.WithField("user", userinfo)
 	authorizationUserInfo := e.getUserInfo(r, userinfo)
 

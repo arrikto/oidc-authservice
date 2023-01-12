@@ -17,7 +17,6 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/patrickmn/go-cache"
-	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 	"golang.org/x/oauth2"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -26,6 +25,7 @@ import (
 const CacheCleanupInterval = 10
 
 func main() {
+	log := common.StandardLogger()
 
 	c, err := common.ParseConfig()
 	if err != nil {
