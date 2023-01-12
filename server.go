@@ -184,12 +184,12 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promp
 
 			if userInfo != nil {
 				logger.Infof("Successfully authenticated request using the cache.")
-				logger.Infof("UserInfo: %+v", userInfo)
+				logger.Debugf("UserInfo: %+v", userInfo)
 				return userInfo, true
 			}
 		}
 
-		logger.Infof("%s starting...", strings.Title(authenticatorsMapping[i]))
+		logger.Debugf("%s starting...", strings.Title(authenticatorsMapping[i]))
 		resp, found, err := auth.AuthenticateRequest(r)
 		if err != nil {
 			logger.Errorf("Error authenticating request using %s: %v", authenticatorsMapping[i], err)
@@ -215,11 +215,11 @@ func (s *server) tryAuthenticators(w http.ResponseWriter, r *http.Request, promp
 		if found {
 			logger.Infof("Successfully authenticated request using %s", authenticatorsMapping[i])
 			userInfo = resp.User
-			logger.Infof("UserInfo: %+v", userInfo)
+			logger.Debugf("UserInfo: %+v", userInfo)
 
 			if s.cacheEnabled && cacheKey != "" && promptLogin {
 				// If cache is enabled and the current authenticator is Cacheable, store the UserInfo to cache.
-				logger.Infof("Caching authenticated UserInfo...")
+				logger.Debugf("Caching authenticated UserInfo...")
 				s.bearerUserInfoCache.Set(cacheKey, userInfo, time.Duration(s.cacheExpirationMinutes)*time.Minute)
 			}
 			return userInfo, true
@@ -292,14 +292,14 @@ func (s *server) getCachedUser(auth authenticators.AuthenticatorRequest, r *http
 			cachedUserInfo, found := s.bearerUserInfoCache.Get(cacheKey)
 			if found {
 				userInfo := cachedUserInfo.(user.Info)
-				logger.Infof("Found Cached UserInfo: %+v", userInfo)
+				logger.Debugf("Found Cached UserInfo: %+v", userInfo)
 				return userInfo, cacheKey
 			}
 			return nil, cacheKey
 		}
 	}
 
-	logger.Info("The UserInfo is not cached.")
+	logger.Debug("The UserInfo is not cached.")
 	return nil, ""
 }
 
@@ -551,7 +551,7 @@ func (s *server) whitelistMiddleware(whitelist []string, isReady *abool.AtomicBo
 			// Check whitelist
 			for _, prefix := range whitelist {
 				if strings.HasPrefix(path, prefix) {
-					logger.Infof("URI is whitelisted. Accepted without authorization.")
+					logger.Debugf("URI is whitelisted. Accepted without authorization.")
 					if verify {
 						w.WriteHeader(http.StatusNoContent)
 					} else {

@@ -169,7 +169,7 @@ func validAccessTokenAuthn(AccessTokenAuthnEnabledEnv bool, AccessTokenAuthnEnv 
 		return true
 	}
 
-	log.Info("Please select exactly one of the supported options: " +
+	log.Warn("Please select exactly one of the supported options: " +
 	"i) jwt: to enable the JWT access token authentication method, " +
 	"ii) opaque: to enable the opaque access token authentication method")
 
@@ -186,7 +186,7 @@ func validSessionStoreType(SessionStoreType string) (bool){
 		return true
 	}
 
-	log.Info("Please select exactly one of the options: " +
+	log.Warn("Please select exactly one of the options: " +
 	"i) boltdb: to select the BoltDB supported session store, " +
 	"ii) redis: to select the Redis supported session store")
 

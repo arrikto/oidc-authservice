@@ -65,15 +65,15 @@ func SessionFromRequest(r *http.Request, store sessions.Store, cookie,
 	if sessionID != "" {
 		s, err := SessionFromID(sessionID, store)
 		if err == nil && !s.IsNew {
-			logger.Infof("Loading session from header %s", header)
+			logger.Debugf("Loading session from header %s", header)
 			// Authentication using header successfully completed
 			authMethod = "header"
 			return s, authMethod, nil
 		}
-		logger.Infof("Header %s didn't contain a valid session id: %v", header, err)
+		logger.Debugf("Header %s didn't contain a valid session id: %v", header, err)
 	}
 	// Header failed, try to get session from cookie
-	logger.Infof("Loading session from cookie %s", cookie)
+	logger.Debugf("Loading session from cookie %s", cookie)
 	s, err := store.Get(r, cookie)
 	if err == nil && !s.IsNew {
 		authMethod = "cookie"

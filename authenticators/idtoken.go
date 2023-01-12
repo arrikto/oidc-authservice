@@ -24,7 +24,7 @@ func (s *IDTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authentica
 	// get id-token from header
 	bearer := common.GetBearerToken(r.Header.Get(s.Header))
 	if len(bearer) == 0 {
-		logger.Info("No bearer token found")
+		logger.Debug("No bearer token found")
 		return nil, false, nil
 	}
 
