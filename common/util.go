@@ -69,6 +69,20 @@ func StandardLogger() *log.Logger {
 	return log.StandardLogger()
 }
 
+func SetLogLevel(level string) {
+	if level =="FATAL" {
+		log.SetLevel(log.FatalLevel)
+	} else if level == "ERROR" {
+		log.SetLevel(log.ErrorLevel)
+	} else if level == "WARN" {
+		log.SetLevel(log.WarnLevel)
+	} else if level == "INFO" {
+		log.SetLevel(log.InfoLevel)
+	} else {
+		log.SetLevel(log.DebugLevel)
+	}
+}
+
 func getUserIP(r *http.Request) string {
 	headerIP := r.Header.Get("X-Forwarded-For")
 	if headerIP != "" {

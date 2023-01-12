@@ -32,6 +32,7 @@ type Config struct {
 	AfterLoginURL        *url.URL `split_words:"true"`
 	AfterLogoutURL       *url.URL `split_words:"true"`
 	VerifyAuthURL        *url.URL `split_words:"true"`
+	LogLevel             string   `split_words:"true" default:"INFO"`
 
 	// Identity Headers
 	UserIDHeader      string            `split_words:"true" default:"kubeflow-userid" envconfig:"USERID_HEADER"`
@@ -108,6 +109,10 @@ func ParseConfig() (*Config, error) {
 	if !validSessionStoreType(c.SessionStoreType){
 		log.Fatalf("Unsupported value for the type of the session store:" +
 			"SESSION_STORE_TYPE=%s",c.SessionStoreType)
+	}
+	if !validLogLevel(c.LogLevel){
+		log.Fatalf("Unsupported value for the log level messages:" +
+		"LOG_LEVEL=%s",c.LogLevel)
 	}
 	c.UserTemplateContext = getEnvsFromPrefix("TEMPLATE_CONTEXT_")
 
@@ -189,6 +194,31 @@ func validSessionStoreType(SessionStoreType string) (bool){
 	log.Warn("Please select exactly one of the options: " +
 	"i) boltdb: to select the BoltDB supported session store, " +
 	"ii) redis: to select the Redis supported session store")
+
+	return false
+}
+
+// validLogLevel() examines if the admins have configured a valid value for the
+// LOG_LEVEL envvar.
+func validLogLevel(level string) bool {
+	if level == "FATAL" {
+		return true
+	} else if level == "ERROR" {
+		return true
+	} else if level == "WARN" {
+		return true
+	} else if level == "INFO" {
+		return true
+	} else if level == "DEBUG" {
+		return true
+	}
+
+	log.Warn("Please select exactly one of the options for the LOG_LEVEL: " +
+	"i) FATAL: to print fatal log level messages, " +
+	"ii) ERROR: to print error log level messages and above, " +
+	"iii) WARN: to print warn log level messages and above, " +
+	"iv) INFO: to print info log level messages and above, " +
+	"v) DEBUG: to pring messages of all the available log levels")
 
 	return false
 }

@@ -33,6 +33,9 @@ func main() {
 	}
 	log.Infof("Config: %+v", c)
 
+	// Set log level
+	common.SetLogLevel(c.LogLevel)
+
 	// Start readiness probe immediately
 	log.Infof("Starting readiness probe at %v", c.ReadinessProbePort)
 	isReady := abool.New()

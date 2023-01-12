@@ -63,6 +63,7 @@ Following environment variables are used by the software.
 | `VERIFY_AUTH_URL` | `AUTHSERVICE_URL_PREFIX/verify` | Path to the `/verify` endpoint. This endpoint examines a subrequest and returns `204` if the user is authenticated and authorized to perform such a request, otherwise it will return `401` if the user cannot be authenticated or `403` if the user is authenticated but they are not authorized to perform this request. |
 | `AUTH_HEADER` | `Authorization` | When the AuthService logs in a user, it creates a session for them and saves it in its database. The session secret value is saved in a cookie in the user's browser. However, for programmatic access to endpoints, it is better to use headers to authenticate. The AuthService also accepts credentials in a header configured by the `AUTH_HEADER` setting. |
 | `ID_TOKEN_HEADER` | `Authorization` | When id token is carried in this header, OIDC Authservice verifies the id token and uses the `USERID_CLAIM` inside the id token. If the `USERID_CLAIM` doesn't exist, the authentication would fail.|
+| `LOG_LEVEL` | "INFO" | Set the log level to one of "FATAL", "ERROR", "WARN", "INFO", or "DEBUG" to specify the verbosity of the OIDC-Authservice logs. |
 
 The AuthService provides a web server with some defaults pages for a `homepage`
 and an `after_logout` page. The following values are about these pages. To
