@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/arrikto/oidc-authservice/authenticator"
@@ -14,32 +13,37 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-// yaml config based fine-grained group authorization
-
-// AuthzConfig is the authorization schema
+// AuthzConfig is the authorization schema, a yaml config based with fine-grained
+// group authorization control.
 type AuthzConfig struct {
+	// DefaultRule defines the behavior when a host does not match any known rule.
+	//
+	// If no default rule is provided the default behavior is AllowAll.
+	DefaultRule *HostRule `yaml:"default"`
 	// Rules is a map from host name to HostRule which contain authorization
 	// rules that apply to the host
 	Rules map[string]HostRule `yaml:"rules"`
 }
 
-// HostRule describesauthorization rules for requests that match a given host name
-// XXX what to do when there is no rule for a host (the default caes)?
-// prob want at least an option to either allow all or require some default groups.
+// HostRule describes authorization rules for requests that match a given host name.
+//
+// Membership is required for at least 1 group in the list.
 type HostRule struct {
-	// groupMatcher map[string]struct{}
-	// membership is required for at least 1 group in the list
 	Groups []string `yaml:"groups"`
-	// XXX could be cool to have an option to require menbership in all groups.
-	//     implementation idea - add a `requireAll bool` field that is false by default.
+}
+
+// Matcher returns a set of groups to allow or deny.
+func (h HostRule) Matcher() ruleMatcher {
+	return newRuleMatcher(h.Groups)
 }
 
 type configAuthorizer struct {
-	config       *AuthzConfig
-	configPath   string
-	groupMatcher map[string]map[string]struct{}
-	watcher      *fsnotify.Watcher
-	lock         sync.RWMutex
+	config         *AuthzConfig
+	configPath     string
+	groupMatcher   map[string]ruleMatcher
+	defaultMatcher ruleMatcher
+	watcher        *fsnotify.Watcher
+	lock           sync.RWMutex
 }
 
 func NewConfigAuthorizer(configPath string) (Authorizer, error) {
@@ -106,17 +110,21 @@ func (ca *configAuthorizer) loadConfig() error {
 	}
 
 	// build groupMatcher map
-	groupMatcher := make(map[string]map[string]struct{})
+	groupMatcher := make(map[string]ruleMatcher)
 	for host, rule := range authzConfig.Rules {
-		groupMatcher[host] = make(map[string]struct{})
-		for _, g := range rule.Groups {
-			groupMatcher[host][g] = struct{}{}
-		}
+		groupMatcher[host] = rule.Matcher()
 	}
+
+	defaultMatcher := newRuleMatcher([]string{"*"}) // allow all by default
+	if authzConfig.DefaultRule != nil {
+		defaultMatcher = authzConfig.DefaultRule.Matcher()
+	}
+
 	log.Infof("loaded AuthzConfig: %+v", *authzConfig)
 	ca.lock.Lock()
 	defer ca.lock.Unlock()
 	ca.groupMatcher = groupMatcher
+	ca.defaultMatcher = defaultMatcher
 	ca.config = authzConfig
 	return nil
 }
@@ -143,33 +151,35 @@ func (ca *configAuthorizer) parseConfig(path string) (*AuthzConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("errors while parsing AuthzConfig file %q: %v", path, err)
 	}
-
 	return c, nil
+}
+
+func formatReason(authed bool, user, host, matched, reason string) string {
+	const f = "access %s: user=%s host=%s matched=%s reason=%q"
+	if authed {
+		return fmt.Sprintf(f, "granted", user, host, matched, reason)
+	}
+	return fmt.Sprintf(f, "denied", user, host, matched, reason)
 }
 
 func (ca *configAuthorizer) Authorize(r *http.Request, user *authenticator.User) (bool, string, error) {
 	host := r.Host
 
 	ca.lock.RLock()
-	allowedGroups, ok := ca.groupMatcher[host]
+	hostMatcher, ok := ca.groupMatcher[host]
+	defaultMatcher := ca.defaultMatcher
 	ca.lock.RUnlock()
-	// no groups specified for the host, allow the request
-	if !ok {
-		// TODO make this default behavior configurable
-		return true, "", nil
+
+	authed := false
+	reason := ""
+	if ok {
+		authed, reason = hostMatcher.Match(user)
+		reason = formatReason(authed, user.Name, host, host, reason)
+	} else {
+		authed, reason = defaultMatcher.Match(user)
+		reason = formatReason(authed, user.Name, host, "default", reason)
 	}
-	for _, g := range user.Groups {
-		if _, allowed := allowedGroups[g]; allowed {
-			log.Infof("authorization success: host=%s user=%s matchedGroup=%s ", host, user.Name, g)
-			return true, "", nil
-		}
-	}
-	// XXX think about how to better have groupMatcher + list available to print
-	// consider in relation to reloading the authzConfig.
-	// or do some async update?
-	// do we update config + matcher atomically
-	// XXX where to syncronhize with mutex?
-	groupsList := ca.config.Rules[host].Groups
-	reason := fmt.Sprintf("access to host %q requires membership in one of ([%s])", host, strings.Join(groupsList, ","))
-	return false, reason, nil
+
+	log.Infof("authorization: %v", reason)
+	return authed, reason, nil
 }

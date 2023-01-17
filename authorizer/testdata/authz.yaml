@@ -1,0 +1,8 @@
+rules:
+  foo.bar.io:
+    groups:
+      - a@b.com
+      - b@b.com
+  bar.io:
+    groups:
+      - c@c.com
