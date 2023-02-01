@@ -54,7 +54,8 @@ func (sa *sessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		ctx := setTLSContext(r.Context(), sa.caBundle)
 		token := session.Values[userSessionOAuth2Tokens].(oauth2.Token)
 		// TokenSource takes care of automatically renewing the access token.
-		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token))
+		logger.Infof("ATHINAPL-token: %+v", token)
+		_, err := GetUserInfo(ctx, sa.provider, sa.oauth2Config.TokenSource(ctx, &token), logger)
 		if err != nil {
 			var reqErr *requestError
 			if !errors.As(err, &reqErr) {

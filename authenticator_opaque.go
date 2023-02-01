@@ -36,7 +36,7 @@ func (s *opaqueTokenAuthenticator) AuthenticateRequest(r *http.Request) (*authen
 
 	ctx := setTLSContext(r.Context(), s.caBundle)
 
-	userInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, opaque))
+	userInfo, err := GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, opaque), logger)
 	if err != nil {
 		var reqErr *requestError
 		if !errors.As(err, &reqErr) {

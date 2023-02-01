@@ -10,6 +10,8 @@ import (
 	"github.com/coreos/go-oidc"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // UserInfo represents the OpenID Connect userinfo claims.
@@ -78,7 +80,7 @@ func ParseUserInfo(body []byte) (*UserInfo, error){
 // contacting the UserInfo endpoint.
 //
 // [1]: https://github.com/coreos/go-oidc/blob/v2.1.0/oidc.go#L180
-func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth2.TokenSource) (*UserInfo, error) {
+func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth2.TokenSource, logger *log.Entry) (*UserInfo, error) {
 
 	discoveryClaims := &struct {
 		UserInfoURL string `json:"userinfo_endpoint"`
@@ -97,7 +99,9 @@ func GetUserInfo(ctx context.Context, provider *oidc.Provider, tokenSource oauth
 		return nil, errors.Errorf("oidc: create GET request: %v", err)
 	}
 
+	logger.Infof("ATHINAPL-tokenSource pre token source: %+v", tokenSource)
 	token, err := tokenSource.Token()
+	logger.Infof("ATHINAPL-token after token source: %+v", token)
 
 	if err != nil {
 		return nil, errors.Errorf("oidc: get access token: %v", err)
