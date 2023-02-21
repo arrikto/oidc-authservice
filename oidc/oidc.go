@@ -71,7 +71,7 @@ func (u *UserInfo) Claims(v interface{}) error {
 
 // ParseUserInfo unmarshals the response of the UserInfo endpoint
 // and enforces boolean value for the EmailVerified claim.
-func ParseUserInfo(body []byte) (*UserInfo, error){
+func ParseUserInfo(body []byte) (*UserInfo, error) {
 
 	raw := struct {
 		Subject       string      `json:"sub"`
@@ -111,13 +111,33 @@ func ParseUserInfo(body []byte) (*UserInfo, error){
 	return userInfo, nil
 }
 
+// TokenSource is a wrapper around oauth2.Config.TokenSource that additionally
+// returns a boolean indicator for a token refresh.
+func TokenSource(ctx context.Context, config *oauth2.Config,
+	token *oauth2.Token) (*oauth2.Token, bool, error) {
+
+	tokenSource := config.TokenSource(ctx, token)
+
+	newToken, err := tokenSource.Token()
+	if err != nil {
+		return nil, false, errors.Errorf("oidc: get access token: %v", err)
+	}
+
+	// Check if access token has been refreshed
+	if (newToken.AccessToken != token.AccessToken) || (newToken.RefreshToken != token.RefreshToken) {
+		return newToken, true, nil
+	}
+
+	return token, false, nil
+}
+
 // GetUserInfo uses the token source to query the provider's user info endpoint.
 // We reimplement UserInfo [1] instead of using the go-oidc's library UserInfo, in
 // order to include HTTP response information in case of an error during
 // contacting the UserInfo endpoint.
 //
 // [1]: https://github.com/coreos/go-oidc/blob/v2.1.0/oidc.go#L180
-func GetUserInfo(ctx context.Context, provider Provider, tokenSource oauth2.TokenSource) (*UserInfo, error) {
+func GetUserInfo(ctx context.Context, provider Provider, token *oauth2.Token) (*UserInfo, error) {
 
 	discoveryClaims := &struct {
 		UserInfoURL string `json:"userinfo_endpoint"`
@@ -136,11 +156,6 @@ func GetUserInfo(ctx context.Context, provider Provider, tokenSource oauth2.Toke
 		return nil, errors.Errorf("oidc: create GET request: %v", err)
 	}
 
-	token, err := tokenSource.Token()
-
-	if err != nil {
-		return nil, errors.Errorf("oidc: get access token: %v", err)
-	}
 	token.SetAuthHeader(req)
 
 	resp, err := common.DoRequest(ctx, req)

@@ -50,12 +50,25 @@ func (sa *SessionAuthenticator) AuthenticateRequest(r *http.Request) (*authentic
 		return nil, false, nil
 	}
 
+	ctx := common.SetTLSContext(r.Context(), sa.CaBundle)
+	token := session.Values[sessions.UserSessionOAuth2Tokens].(oauth2.Token)
+
+	newToken, err := sessions.SaveToken(session, ctx, sa.Oauth2Config, &token, httptest.NewRecorder())
+	if err != nil {
+		logger.Errorf("Failed to refresh token: %v", err)
+		// Access token has expired
+		logger.Info("OAuth2 tokens have expired, revoking OIDC session")
+		revokeErr := sessions.RevokeOIDCSession(ctx, httptest.NewRecorder(),
+			session, sa.Provider, sa.Oauth2Config, sa.CaBundle)
+		if revokeErr != nil {
+			logger.Errorf("Failed to revoke tokens: %v", revokeErr)
+		}
+		return nil, false, err
+	}
+
 	// User is logged in
 	if sa.StrictSessionValidation {
-		ctx := common.SetTLSContext(r.Context(), sa.CaBundle)
-		token := session.Values[sessions.UserSessionOAuth2Tokens].(oauth2.Token)
-		// TokenSource takes care of automatically renewing the access token.
-		_, err := oidc.GetUserInfo(ctx, sa.Provider, sa.Oauth2Config.TokenSource(ctx, &token))
+		_, err = oidc.GetUserInfo(ctx, sa.Provider, newToken)
 		if err != nil {
 			var reqErr *common.RequestError
 			if !errors.As(err, &reqErr) {

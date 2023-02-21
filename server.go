@@ -379,14 +379,16 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 
 	// UserInfo endpoint to get claims
 	claims := map[string]interface{}{}
-	oidcUserInfo, err := oidc.GetUserInfo(ctx, s.provider, s.oauth2Config.TokenSource(ctx, oauth2Tokens))
+
+	newTokens, _, err := oidc.TokenSource(ctx, s.oauth2Config, oauth2Tokens)
+	userInfo, err := oidc.GetUserInfo(ctx, s.provider, newTokens)
 	if err != nil {
 		logger.Errorf("Not able to fetch userinfo: %v", err)
 		common.ReturnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo.")
 		return
 	}
 
-	if err = oidcUserInfo.Claims(&claims); err != nil {
+	if err = userInfo.Claims(&claims); err != nil {
 		logger.Errorf("Problem getting userinfo claims: %v", err)
 		common.ReturnMessage(w, http.StatusInternalServerError, "Not able to fetch userinfo claims.")
 		return

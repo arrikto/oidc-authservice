@@ -115,7 +115,7 @@ func TestGetUserInfo_ContextCancelled(t *testing.T) {
 
 	// Make a UserInfo request
 	_, err = GetUserInfo(context.Background(), provider,
-		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test"}))
+		&oauth2.Token{AccessToken: "test"})
 
 	// Check that we find a wrapped requestError
 	var reqErr *common.RequestError

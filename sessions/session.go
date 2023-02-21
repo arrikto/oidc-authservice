@@ -3,6 +3,7 @@ package sessions
 import (
 	"context"
 	"net/http"
+	"sync"
 
 	"github.com/arrikto/oidc-authservice/common"
 	"github.com/arrikto/oidc-authservice/oidc"
@@ -123,6 +124,31 @@ func RevokeOIDCSession(ctx context.Context, w http.ResponseWriter,
 	}
 
 	return revokeSession(ctx, w, session)
+}
+
+var mutex sync.Mutex
+
+// SaveToken triggers oidc.TokenSource to refresh access and refresh token
+// if they have expired and saves them to the session
+func SaveToken(session *sessions.Session, ctx context.Context,
+	config *oauth2.Config, token *oauth2.Token,
+	w http.ResponseWriter) (*oauth2.Token, error) {
+
+	logger := common.StandardLogger()
+
+	newToken, new, err := oidc.TokenSource(ctx, config, token)
+
+	if new {
+		mutex.Lock()
+		defer mutex.Unlock()
+		session.Values[UserSessionOAuth2Tokens] = newToken
+		r := &http.Request{}
+		if err := session.Save(r.WithContext(ctx), w); err != nil {
+			logger.Fatalf("Failed to update token in session: %v", err)
+		}
+		logger.Infof("Updated token in session")
+	}
+	return newToken, err
 }
 
 // InitiateSessionStores initiates both the required stores for the:
