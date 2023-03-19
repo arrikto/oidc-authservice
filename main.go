@@ -113,7 +113,7 @@ func main() {
 		log.Fatalf("Error getting K8s config: %v", err)
 	} else if err != nil {
 		// If Kubernetes authenticator is disabled, ignore the error.
-		log.Debugf("Error getting K8s config: %v. " +
+		log.Debugf("Error getting K8s config: %v. "+
 			"Kubernetes authenticator is disabled, skipping ...", err)
 	} else {
 		k8sAuthenticator, err = authenticators.NewKubernetesAuthenticator(
@@ -122,7 +122,7 @@ func main() {
 			log.Fatalf("Error creating K8s authenticator: %v", err)
 		} else if err != nil {
 			// If Kubernetes authenticator is disabled, ignore the error.
-			log.Debugf("Error creating K8s authenticator:: %v. " +
+			log.Debugf("Error creating K8s authenticator:: %v. "+
 				"Kubernetes authenticator is disabled, skipping ...", err)
 		}
 	}

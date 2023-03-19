@@ -38,6 +38,96 @@ func TestGroupsAuthorizer(t *testing.T) {
 			userGroups: []string{"d", "e"},
 			allowed:    false,
 		},
+		{
+			name:       "user groups in allowlist wildcard prefix 1",
+			allowlist:  []string{"agroup*"},
+			userGroups: []string{"agroup"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups in allowlist wildcard prefix 2",
+			allowlist:  []string{"agroup*"},
+			userGroups: []string{"agroup-any-character"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups not in allowlist wildcard prefix 1",
+			allowlist:  []string{"agroup*"},
+			userGroups: []string{"any-character-agroup-any-character"},
+			allowed:    false,
+		},
+		{
+			name:       "user groups not in allowlist wildcard prefix 2",
+			allowlist:  []string{"agroup*"},
+			userGroups: []string{"any-character-agroup"},
+			allowed:    false,
+		},
+		{
+			name:       "user groups in allowlist wildcard suffix 1",
+			allowlist:  []string{"*agroup"},
+			userGroups: []string{"agroup"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups in allowlist wildcard suffix 2",
+			allowlist:  []string{"*agroup"},
+			userGroups: []string{"any-character-agroup"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups not in allowlist wildcard suffix 1",
+			allowlist:  []string{"*agroup"},
+			userGroups: []string{"agroup-any-character"},
+			allowed:    false,
+		},
+		{
+			name:       "user groups not in allowlist wildcard suffix 2",
+			allowlist:  []string{"agroup*"},
+			userGroups: []string{"any-character-agroup-any-character"},
+			allowed:    false,
+		},
+		{
+			name:       "user groups in allowlist wildcard match 1",
+			allowlist:  []string{"*agroup*"},
+			userGroups: []string{"agroup"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups in allowlist wildcard match 2",
+			allowlist:  []string{"*agroup*"},
+			userGroups: []string{"agroup-any-character"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups in allowlist wildcard match 3",
+			allowlist:  []string{"*agroup*"},
+			userGroups: []string{"any-character-agroup"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups in allowlist wildcard match 4",
+			allowlist:  []string{"*agroup*"},
+			userGroups: []string{"any-character-agroup-any-character"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups in allowlist wildcard match 5",
+			allowlist:  []string{"group/*/test"},
+			userGroups: []string{"group/2/test"},
+			allowed:    true,
+		},
+		{
+			name:       "user groups not in allowlist wildcard match 1",
+			allowlist:  []string{"group/*/test"},
+			userGroups: []string{"group/test"},
+			allowed:    false,
+		},
+		{
+			name:       "user groups not in allowlist wildcard match 2",
+			allowlist:  []string{"*agroup*"},
+			userGroups: []string{"any-character"},
+			allowed:    false,
+		},
 	}
 
 	for _, test := range tests {
