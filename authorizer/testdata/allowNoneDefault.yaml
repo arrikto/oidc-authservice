@@ -1,0 +1,6 @@
+default:
+  groups:
+rules:
+  ok.io:
+    groups:
+      - foo@bar.go

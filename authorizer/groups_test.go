@@ -42,13 +42,13 @@ func TestGroupsAuthorizer(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			authz := newGroupsAuthorizer(test.allowlist)
+			authz := NewGroupsAuthorizer(test.allowlist)
 			user := &authenticator.User{
 				Groups: test.userGroups,
 			}
 			allowed, reason, err := authz.Authorize(nil, user)
-			require.NoError(t, err, "Unexpected error")
-			require.Equalf(t, test.allowed, allowed, "Reason: %s", reason)
+			require.NoError(t, err, "unexpected error")
+			require.Equalf(t, test.allowed, allowed, "%s", reason)
 		})
 	}
 }

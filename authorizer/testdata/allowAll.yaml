@@ -1,0 +1,6 @@
+rules:
+  happytohaveyou.io:
+    groups:
+      - '*'
+  nothappy.io:
+    groups:

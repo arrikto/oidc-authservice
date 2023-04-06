@@ -1,0 +1,8 @@
+default:
+  groups:
+    - foo
+rules:
+  foo.bar.io:
+    groups:
+      - baz@bar.com
+      - beef@bar.com
