@@ -2,10 +2,12 @@ package authorizer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/arrikto/oidc-authservice/authenticator"
 	log "github.com/sirupsen/logrus"
@@ -39,72 +41,75 @@ func (h HostRule) Matcher() ruleMatcher {
 
 type configAuthorizer struct {
 	config         *AuthzConfig
-	configPath     string
+	path           string
 	groupMatcher   map[string]ruleMatcher
 	defaultMatcher ruleMatcher
-	watcher        *fsnotify.Watcher
 	lock           sync.RWMutex
 }
 
-func NewConfigAuthorizer(configPath string) (Authorizer, error) {
+func watchLoop(watcher *fsnotify.Watcher, path string, do func() error) error {
+	if err := watcher.Add(path); err != nil {
+		return err
+	}
+	for {
+		select {
+		case ev, ok := <-watcher.Events:
+			if !ok {
+				return errors.New("watcher events channel closed")
+			}
+
+			log.Debugf("file watcher event: name=%s op=%s", ev.Name, ev.Op)
+
+			// do nothing on Chmod
+			if ev.Op == fsnotify.Chmod {
+				continue
+			}
+
+			if ev.Op&fsnotify.Remove == fsnotify.Remove {
+				return errors.New("watcher path removed")
+			}
+
+			log.Infof("try to reload %s", path)
+			if err := do(); err != nil {
+				return fmt.Errorf("failed to reload: %w", err)
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return fmt.Errorf("watcher event errors channel closed")
+			}
+			return fmt.Errorf("watcher error: %w", err)
+		}
+	}
+
+}
+
+func NewConfigAuthorizer(path string) (Authorizer, error) {
 	ca := configAuthorizer{}
-	ca.configPath = configPath
+	ca.path = path
 	if err := ca.loadConfig(); err != nil {
 		return nil, err
 	}
 
-	var err error
-	ca.watcher, err = fsnotify.NewWatcher()
-	if err != nil {
-		return nil, fmt.Errorf("error creating file watcher: %v", err)
-	}
-
-	defer ca.watcher.Close()
 	go func() {
-		for {
-			select {
-			case ev, ok := <-ca.watcher.Events:
-				if !ok {
-					return
-				}
-
-				log.Debugf("file watcher event: name=%s op=%s", ev.Name, ev.Op)
-				// do nothing on Chmod
-				if ev.Op == fsnotify.Chmod {
-					continue
-				}
-
-				if ev.Op&fsnotify.Remove == fsnotify.Remove {
-					// read watcher on remove because fsnotify stops watching
-					if err := ca.watcher.Add(ev.Name); err != nil {
-						log.Errorf(
-							"failed to read watcher for file %q", configPath)
-					}
-				}
-
-				log.Infof("try to reload config file...")
-				if err := ca.loadConfig(); err != nil {
-					log.Errorf("failed to reload config: %v", err)
-				}
-			case err, ok := <-ca.watcher.Errors:
-				if !ok {
-					return
-				}
-				log.Infof("watcher error: %v", err)
+		for i := 0; i < 5; i++ { // allow 5 failures before giving up
+			watcher, err := fsnotify.NewWatcher()
+			if err != nil {
+				log.Errorf("couldn't create fsnotify watcher: %v", err)
 			}
+			if err = watchLoop(watcher, ca.path, ca.loadConfig); err != nil {
+				log.Errorf("configAuthorizer: error watching %q: %v", ca.path, err)
+			}
+			watcher.Close()
+			time.Sleep(1 * time.Second)
 		}
+		log.Fatal("configAuthorizer: watch loop failed, cannot continue")
 	}()
-
-	err = ca.watcher.Add(configPath)
-	if err != nil {
-		log.Fatalf("Error updating file watcher: %v", err)
-	}
 
 	return &ca, nil
 }
 
 func (ca *configAuthorizer) loadConfig() error {
-	authzConfig, err := ca.parseConfig(ca.configPath)
+	authzConfig, err := ca.parseConfig(ca.path)
 	if err != nil {
 		return fmt.Errorf("failed to parse config: %v", err)
 	}
