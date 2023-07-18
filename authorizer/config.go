@@ -92,6 +92,18 @@ func NewConfigAuthorizer(path string) (Authorizer, error) {
 
 	go func() {
 		for i := 0; i < 5; i++ { // allow 5 failures before giving up
+
+			// loadConfig() before attempting to create a watcher
+			// We only want to do this on watcher reload (after an error),
+			// and avoid doing this for the first iteration
+			// since we have already run loadConfig() before we entered
+			// this loop
+			if i != 0 {
+				log.Infof("configAuthorizer: try to reload %s", path)
+				if err := ca.loadConfig(); err != nil {
+					log.Errorf("configAuthorizer: failed to reload %q: %v", ca.path, err)
+				}
+			}
 			watcher, err := fsnotify.NewWatcher()
 			if err != nil {
 				log.Errorf("couldn't create fsnotify watcher: %v", err)
