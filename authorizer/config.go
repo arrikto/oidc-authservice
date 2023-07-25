@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/common"
 	log "github.com/sirupsen/logrus"
 	fsnotify "gopkg.in/fsnotify/fsnotify.v1"
 	yaml "gopkg.in/yaml.v3"
@@ -179,7 +179,7 @@ func formatReason(authed bool, user, host, matched, reason string) string {
 	return fmt.Sprintf(f, "denied", user, host, matched, reason)
 }
 
-func (ca *configAuthorizer) Authorize(r *http.Request, user *authenticator.User) (bool, string, error) {
+func (ca *configAuthorizer) Authorize(r *http.Request, user *common.User) (bool, string, error) {
 	host := r.Host
 
 	ca.lock.RLock()

@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/common"
 )
 
 // Authorizer decides if a request, made by the given identity, is allowed.
 // The interface draws some inspiration from Kubernetes' interface:
 // https://github.com/kubernetes/apiserver/blob/master/pkg/authorization/authorizer/interfaces.go#L67-L72
 type Authorizer interface {
-	Authorize(r *http.Request, user *authenticator.User) (allowed bool, reason string, err error)
+	Authorize(r *http.Request, user *common.User) (allowed bool, reason string, err error)
 }
 
 const (
@@ -39,7 +39,7 @@ func newRuleMatcher(allowlist []string) ruleMatcher {
 // Match matches a user to a set of rules.
 //
 // It also returns a reason for why the user was allowed access.
-func (rm ruleMatcher) Match(user *authenticator.User) (bool, string) {
+func (rm ruleMatcher) Match(user *common.User) (bool, string) {
 	if _, ok := rm.allowAny[wildcardMatcher]; ok {
 		return ok, "wildcard matching"
 	}

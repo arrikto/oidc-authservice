@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,15 +27,15 @@ func TestLoadConfig(t *testing.T) {
 	t.Logf("loaded config: %v", *authzConfig)
 }
 
-func user(n string, groups ...string) *authenticator.User {
-	return &authenticator.User{Name: n, Groups: groups}
+func user(n string, groups ...string) *common.User {
+	return &common.User{Name: n, Groups: groups}
 }
 
 func TestConfigAuthorizerMatching(t *testing.T) {
 	type matchTCase struct {
 		host  string
 		match bool
-		user  *authenticator.User
+		user  *common.User
 	}
 
 	tests := []struct {

@@ -40,7 +40,7 @@ Following environment variables are used by the software.
 | Setting | Description |
 | - | - |
 | `OIDC_PROVIDER` |  URL to your OIDC provider. AuthService expects to find information about your OIDC provider at `OIDC_PROVIDER/.well-known/openid-configuration`, and will use this information to contact your OIDC provider and initiate an OIDC flow later on.|
-| `AUTHSERVICE_URL_PREFIX` | AuthService expects end users will be able to access its Web-based UI from the outside world at `AUTHSERVICE_URL_PREFIX`. Usually, it's in the form of `<APP_URL>/authservice/` It expects that your API Gateway will route any URL that starts with `AUTHSERVICE_URL_PREFIX` (@yanniszark) to it, so it can expose its default Web-based UI and API endpoints. AuthService will use this value to auto-generate sane defaults for a number of settings, including `HOMEPAGE_URL`, `LOGOUT_URL`, and `AFTER_LOGOUT_URL`. The default value, `/authservice/` will work out of the box with an Istio `VirtualService` specifying `/authservice/` as its `prefix`. |
+| `AUTHSERVICE_URL_PREFIX` | AuthService expects end users will be able to access its Web-based UI from the outside world at `AUTHSERVICE_URL_PREFIX`. Usually, it's in the form of `<APP_URL>/authservice/` It expects that your API Gateway will route any URL that starts with `AUTHSERVICE_URL_PREFIX` to it, so it can expose its default Web-based UI and API endpoints. AuthService will use this value to auto-generate sane defaults for a number of settings, including `HOMEPAGE_URL`, `LOGOUT_URL`, and `AFTER_LOGOUT_URL`. The default value, `/authservice/` will work out of the box with an Istio `VirtualService` specifying `/authservice/` as its `prefix`. |
 | `CLIENT_ID` | AuthService will use this Client ID when it needs to contact your OIDC provider and initiate an OIDC flow. |
 | `CLIENT_SECRET` | AuthService will use this Client Secret to authenticate itself against your OIDC provider in combination with `CLIENT_ID` when attempting to access your OIDC Provider's protected endpoints |
 
@@ -54,14 +54,16 @@ Following environment variables are used by the software.
 | `OIDC_SCOPES` | `openid,email` | Comma-separated list of [scopes](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims) to request access to. The `openid` scope is always added. |
 | `AUDIENCES` | `istio-ingressgateway.istio-system.svc.cluster.local` | Audiences that the authservice identifies as. Used for authenticators that support audience-scoped tokens. Currently, that is only the Kubernetes authenticator. The default value assumes that the authservice is used at the Istio Gateway in namespace `istio-system`.|
 | `SERVER_HOSTNAME` | `<empty>` | Hostname to listen for judge requests. This is the server that proxies contacts to ask if a request is allowed. The default empty value means all IPv4/6 interfaces (0.0.0.0, ::). |
-| `SERVER_PORT` | `8081` | Port to listen to for judge requests. This is the server that proxies contacts to ask if a request is allowed. |
+| `SERVER_PORT` | `8080` | Port to listen to for judge requests. This is the server that proxies contacts to ask if a request is allowed. |
 | `SKIP_AUTH_URLS` | `<empty>` | Comma-separated list of URL path-prefixes for which to bypass authentication. For example, if `SKIP_AUTH_URL` contains `/my_app/` then requests to `<url>/my_app/*` are allowed without checking any credentials. Contains nothing by default. |
 | `CA_BUNDLE` | `<empty>` | Path to file containing custom CA certificates to trust when connecting to an OIDC provider that uses self-signed certificates. |
 | `AFTER_LOGIN_URL` | `<originally visited url>` | URL to redirect the user to after they login. Defaults to the URL that the user originally visited before they were redirected for login. For example, if a user visited `<app_url>/example` and were redirected for login, they will be redirected to `/example` after login is complete. |
 | `HOMEPAGE_URL` | `AUTHSERVICE_URL_PREFIX/site/homepage` | Homepage of the application that can be accessed by anonymous users. |
 | `AFTER_LOGOUT_URL` | `AUTHSERVICE_URL_PREFIX/site/homepage` | URL to redirect the user to after they logout. This option used to be called `STATIC_DESTINATION_URL`. For backwards compatibility, the old environment variable is also checked.|
+| `VERIFY_AUTH_URL` | `AUTHSERVICE_URL_PREFIX/verify` | Path to the `/verify` endpoint. This endpoint examines a subrequest and returns `204` if the user is authenticated and authorized to perform such a request, otherwise it will return `401` if the user cannot be authenticated or `403` if the user is authenticated but they are not authorized to perform this request. |
 | `AUTH_HEADER` | `Authorization` | When the AuthService logs in a user, it creates a session for them and saves it in its database. The session secret value is saved in a cookie in the user's browser. However, for programmatic access to endpoints, it is better to use headers to authenticate. The AuthService also accepts credentials in a header configured by the `AUTH_HEADER` setting. |
 | `ID_TOKEN_HEADER` | `Authorization` | When id token is carried in this header, OIDC Authservice verifies the id token and uses the `USERID_CLAIM` inside the id token. If the `USERID_CLAIM` doesn't exist, the authentication would fail.|
+| `LOG_LEVEL` | "INFO" | Set the log level to one of "FATAL", "ERROR", "WARN", "INFO", or "DEBUG" to specify the verbosity of the OIDC-Authservice logs. |
 
 The AuthService provides a web server with some defaults pages for a `homepage`
 and an `after_logout` page. The following values are about these pages. To
@@ -89,7 +91,7 @@ To expose the web server in an environment like Kubernetes with Istio, you need 
 | `THEME` | `kubeflow` | Path under `THEMES_URL` where the theme assets are served. |
 | `TEMPLATE_CONTEXT_<key>` | `empty` | Variables that will end up in the user-defined map in the template context. For example, if you define `TEMPLATE_CONTEXT_KEY=VALUE`, then a `KEY: VALUE` entry will be added to the user-defined map in the template context. Used to pass values to site templates and allow for further customization. |
 
-OIDC-AuthService stores sessions and other state in a local file using BoltDB.
+OIDC-AuthService stores sessions and other state in a local file. The users can select between using BoltDB which is the default option or redis for the session store.
 Session store-related settings:
 
 | Setting | Default | Description |
@@ -98,6 +100,10 @@ Session store-related settings:
 | `OIDC_STATE_STORE_PATH` | "/var/lib/authservice/oidc_state.db" | Path to the session store used to save the sessions for the OIDC state parameter. |
 | `SESSION_MAX_AGE` | "86400" | Time in seconds after which sessions expire. Defaults to a day (24h). |
 | `SESSION_SAME_SITE` | "Lax" | SameSite attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite). Its value can be "None", "Lax" or "Strict". |
+| `SESSION_STORE_TYPE`| "boltdb" | Set `SESSION_STORE_TYPE` to either "boltdb" to use BoltDB as the session store, or "redis" to use redis as the session store. Note that only one of the two can be used, also if you select redis then depending on your redis configurations then you might need to set the password and the number of the database that OIDC-AuthService will use as a [redis-client](https://redis.uptrace.dev/guide/go-redis.html#connecting-to-redis-server).|
+| `SESSION_STORE_REDIS_ADDR`| "127.0.0.1:6379" | Set the `host:port` address for the redis session store. |
+| `SESSION_STORE_REDIS_PWD`| "" | Set the password to connect with the redis session store. |
+| `SESSION_STORE_REDIS_DB`| 0 | Set the number of the database that AuthService should use. If not configured and if the redis session store is selected, then AuthService will use the default redis database. |
 | `SESSION_DOMAIN` | "" | Domain attribute of the session cookie. Check details of Domain attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie). If len(SESSION_DOMAIN) > 0 the incoming request's host and scheme are also saved in the state rather than just the path. This enables AuthService to service all subdomains of SESSION_DOMAIN. |
 | `SCHEME_DEFAULT` | `https` | Default scheme for incoming requests. |
 | `SCHEME_HEADER` | `<empty>` | Header to use for incoming request scheme. If ommitted or header is not present in request, SCHEME_DEFAULT will be used instead. |
@@ -122,8 +128,25 @@ Applications can then use those headers to identify the user.
 | `USERID_PREFIX` | "" | Prefix to add to the userid, which will be the value of the `USERID_HEADER`. |
 | `USERID_TRANSFORMERS` | "" | List of transformations for the userid value (from `USERID_CLAIM`) in JSON format `[{"matches": "regex", "replaces": "value"}, ...]`. OIDC AuthService will evaluate the transformation rules in order and if the `matches` pattern matches the userid, the match is replaced by the `replaces` value.  **If multiple rules match, only the first one is applied** and if no rule matches the userid, the original userid will be used. For the `matches` regular expression, use the standard `golang` syntax [(more info)](https://golang.org/pkg/regexp/). Note that a regular expression is a string and the `\` **must be escaped** (using `\\`). For example using `USERID_TRANSFORMERS = '[{"matches": "user@domain\\.com$", "replaces": "internal"}, {"matches": "@domain\\.com$", "replaces": ""}]'`, AuthService will do the following transformation:  `user@domain.com` -> `internal` and `another@domain.com` -> `another`. |
 | `GROUPS_HEADER` | "" | Name of the header containing the groups to be added to the upstream request. Header omitted if unset |
+| `AUTH_METHOD_HEADER` | "Auth-Method" | Name of the header that is included in the proxied requests to inform the upstream app about the authentication method used (`cookie` / `header`). |
 | `TOKEN_HEADER` | "Authorization" | Name of the header containing user id token (JWT) that will be added to the upstream request. |
 | `TOKEN_SCHEME` | "Bearer" | Authorization scheme (e.g. Bearer, Basic) used for user id token. |
+
+OIDC AuthService can authenticate clients based on the bearer token found in the Authorization header of their request. It caches the bearer token and the respective user information. If the incoming request has a cached bearer token then AuthService authenticates this client and proceeds with the basic authorization checks. The following
+settings are related to the caching mechanism:
+
+| Setting | Default | Description |
+| - | - | - |
+| `CACHE_ENABLED` | `false` | Set `CACHE_ENABLED` to `true` to enable caching. |
+| `CACHE_EXPIRATION_MINUTES` | `5` (minutes) | Set the `CACHE_EXPIRATION_MINUTES` value to define how many minutes it takes for every cache entry to expire. |
+
+By default, OIDC AuthService attempts to authenticate client requests with each one of the available authentication methods that it supports. In certain use cases the admins may want to skip the checks performed by one or more  of the authentication methods. OIDC AuthService can be configured to skip a particular authentication method via the following configurations:
+| Setting | Default | Description |
+| - | - | - |
+| `IDTOKEN_AUTHN_ENABLED` | `true` | Set `IDTOKEN_AUTHN_ENABLED` to `false` to disable the ID token authentication method. |
+| `KUBERNETES_AUTHN_ENABLED` | `true` | Set `KUBERNETES_AUTHN_ENABLED` to `false` to disable the Kubernetes authentication method. |
+| `ACCESS_TOKEN_AUTHN_ENABLED` | `true` | Set `ACCESS_TOKEN_AUTHN_ENABLED` to `false` to disable both the access token authentication methods. |
+| `ACCESS_TOKEN_AUTHN` | "jwt" | Set `ACCESS_TOKEN_AUTHN` to either "jwt" to enable the JWT access token authentication method, or "opaque" to enable the opaque access token authentication method. Note that only one of the two access token authentication methods can be used. |
 
 OIDC AuthService can also perform basic authorization checks. The following
 settings are related to authorization:
@@ -131,6 +154,7 @@ settings are related to authorization:
 | Setting | Default | Description |
 | - | - | - |
 | `GROUPS_ALLOWLIST` | "*" | List of groups that are allowed to pass authorization. By default, all groups are allowed. If you change this option, you may want to include the `system:serviceaccounts` group explicitly, if you need the AuthService to accept ServiceAccountTokens. |
+| `EXTERNAL_AUTHZ_URL` | "" | Use an external authorization service. This option is disabled by default, to enable set the value to the target external authorization service (e.g. `EXTERNAL_AUTHZ_URL=http://authorizer/auth`). If you have enabled this option then for a request to be authorized, **both** the group and the external authorization service will have to allow the request. |
 
 ## Usage
 

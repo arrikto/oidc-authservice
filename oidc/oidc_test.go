@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/coreos/go-oidc"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -115,10 +115,10 @@ func TestGetUserInfo_ContextCancelled(t *testing.T) {
 
 	// Make a UserInfo request
 	_, err = GetUserInfo(context.Background(), provider,
-		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test"}))
+		&oauth2.Token{AccessToken: "test"})
 
 	// Check that we find a wrapped requestError
-	var reqErr *svc.RequestError
+	var reqErr *common.RequestError
 	if !errors.As(err, &reqErr) {
 		log.Fatalf("Returned error is not a requestError. Got: %+v", reqErr)
 	}
@@ -126,5 +126,65 @@ func TestGetUserInfo_ContextCancelled(t *testing.T) {
 	if reqErr.Response.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("Got wrong status code. Got '%v', expected '%v'.",
 			reqErr.Response.StatusCode, http.StatusUnauthorized)
+	}
+}
+
+func TestParseUserInfo(t *testing.T) {
+
+	testCases := []struct {
+		testName         string
+		userInfoResponse string
+		success          bool
+	}{
+		{
+			testName:         "EmailVerified: true (boolean)",
+			userInfoResponse: `{"sub": "", "profile": "", "email": "", "email_verified": true}`,
+			success:          true,
+		},
+		{
+			testName:         "EmailVerified: false (boolean)",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": false}`,
+			success:          true,
+		},
+		{
+			testName:         "EmailVerified: true (string)",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": "true"}`,
+			success:          true,
+		},
+		{
+			testName:         "EmailVerified: false (string)",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": "false"}`,
+			success:          true,
+		},
+		{
+			testName:         "EmailVerified: nil",
+			userInfoResponse: `{"sub": "","profile": "","email": ""}`,
+			success:          true,
+		},
+		{
+			testName:         "EmailVerified: not boolean, not string, not nil",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": 42}`,
+			success:          false,
+		},
+		{
+			testName:         "EmailVerified: irrelevant string",
+			userInfoResponse: `{"sub": "","profile": "","email": "","email_verified": "fals"}`,
+			success:          false,
+		},
+	}
+
+	for _, c := range testCases {
+		t.Run(c.testName, func(t *testing.T) {
+			_, err := ParseUserInfo([]byte(c.userInfoResponse))
+
+			success := true
+			if err != nil {
+				success = false
+			}
+
+			if success != c.success {
+				t.Errorf("ParseUserInfo result for %v is not the expected one.", c)
+			}
+		})
 	}
 }
