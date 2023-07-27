@@ -66,6 +66,8 @@ type server struct {
 	userIdTransformer      common.UserIDTransformer
 	caBundle               []byte
 	sessionSameSite        http.SameSite
+	sessionHttpOnly        bool
+	sessionSecure          bool
 }
 
 // authenticate_or_login calls initiates the Authorization Code Flow if the user
@@ -400,6 +402,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
+	session.Options.HttpOnly = s.sessionHttpOnly
+	session.Options.Secure = s.sessionSecure
 
 	userID, ok := claims[s.idTokenOpts.UserIDClaim].(string)
 	if !ok {

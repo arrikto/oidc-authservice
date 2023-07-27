@@ -59,6 +59,8 @@ type Config struct {
 	SessionStoreRedisDB   int    `split_words:"true" default:"0" envconfig:"SESSION_STORE_REDIS_DB"`
 	SessionMaxAge         int    `split_words:"true" default:"86400"`
 	SessionSameSite       string `split_words:"true" default:"Lax"`
+	SessionHttpOnly       bool   `split_words:"true" default:"false"`
+	SessionSecure         bool   `split_words:"true" default:"false"`
 
 	// Site
 	ClientName          string            `split_words:"true" default:"AuthService"`
@@ -102,17 +104,17 @@ func ParseConfig() (*Config, error) {
 	if len(c.VerifyAuthURL.String()) == 0 {
 		c.VerifyAuthURL = ResolvePathReference(c.AuthserviceURLPrefix, VerifyEndpoint)
 	}
-	if !validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn){
-		log.Fatalf("Unsupported access token authentication configuration:" +
-			"ACCESS_TOKEN_AUTHN=%s",c.AccessTokenAuthn)
+	if !validAccessTokenAuthn(c.AccessTokenAuthnEnabled, c.AccessTokenAuthn) {
+		log.Fatalf("Unsupported access token authentication configuration:"+
+			"ACCESS_TOKEN_AUTHN=%s", c.AccessTokenAuthn)
 	}
-	if !validSessionStoreType(c.SessionStoreType){
-		log.Fatalf("Unsupported value for the type of the session store:" +
-			"SESSION_STORE_TYPE=%s",c.SessionStoreType)
+	if !validSessionStoreType(c.SessionStoreType) {
+		log.Fatalf("Unsupported value for the type of the session store:"+
+			"SESSION_STORE_TYPE=%s", c.SessionStoreType)
 	}
-	if !validLogLevel(c.LogLevel){
-		log.Fatalf("Unsupported value for the log level messages:" +
-		"LOG_LEVEL=%s",c.LogLevel)
+	if !validLogLevel(c.LogLevel) {
+		log.Fatalf("Unsupported value for the log level messages:"+
+			"LOG_LEVEL=%s", c.LogLevel)
 	}
 	c.UserTemplateContext = getEnvsFromPrefix("TEMPLATE_CONTEXT_")
 
@@ -163,37 +165,37 @@ func ensureInSlice(elem string, slice []string) []string {
 
 // validAccessTokenAuthn() examines if the admins have configured
 // a valid value for the ACCESS_TOKEN_AUTHN envvar.
-func validAccessTokenAuthn(AccessTokenAuthnEnabledEnv bool, AccessTokenAuthnEnv string) (bool){
+func validAccessTokenAuthn(AccessTokenAuthnEnabledEnv bool, AccessTokenAuthnEnv string) bool {
 	if !AccessTokenAuthnEnabledEnv {
 		return true
 	}
 	if AccessTokenAuthnEnv == "jwt" {
 		return true
 	}
-	if AccessTokenAuthnEnv == "opaque"{
+	if AccessTokenAuthnEnv == "opaque" {
 		return true
 	}
 
 	log.Warn("Please select exactly one of the supported options: " +
-	"i) jwt: to enable the JWT access token authentication method, " +
-	"ii) opaque: to enable the opaque access token authentication method")
+		"i) jwt: to enable the JWT access token authentication method, " +
+		"ii) opaque: to enable the opaque access token authentication method")
 
 	return false
 }
 
 // validSessionStoreType() examines if the admins have configured a valid value
 // for the SESSION_STORE_TYPE envvar.
-func validSessionStoreType(SessionStoreType string) (bool){
+func validSessionStoreType(SessionStoreType string) bool {
 	if SessionStoreType == "boltdb" {
 		return true
 	}
-	if SessionStoreType == "redis"{
+	if SessionStoreType == "redis" {
 		return true
 	}
 
 	log.Warn("Please select exactly one of the options: " +
-	"i) boltdb: to select the BoltDB supported session store, " +
-	"ii) redis: to select the Redis supported session store")
+		"i) boltdb: to select the BoltDB supported session store, " +
+		"ii) redis: to select the Redis supported session store")
 
 	return false
 }
@@ -214,11 +216,11 @@ func validLogLevel(level string) bool {
 	}
 
 	log.Warn("Please select exactly one of the options for the LOG_LEVEL: " +
-	"i) FATAL: to print fatal log level messages, " +
-	"ii) ERROR: to print error log level messages and above, " +
-	"iii) WARN: to print warn log level messages and above, " +
-	"iv) INFO: to print info log level messages and above, " +
-	"v) DEBUG: to pring messages of all the available log levels")
+		"i) FATAL: to print fatal log level messages, " +
+		"ii) ERROR: to print error log level messages and above, " +
+		"iii) WARN: to print warn log level messages and above, " +
+		"iv) INFO: to print info log level messages and above, " +
+		"v) DEBUG: to pring messages of all the available log levels")
 
 	return false
 }

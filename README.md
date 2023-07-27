@@ -100,6 +100,8 @@ Session store-related settings:
 | `OIDC_STATE_STORE_PATH` | "/var/lib/authservice/oidc_state.db" | Path to the session store used to save the sessions for the OIDC state parameter. |
 | `SESSION_MAX_AGE` | "86400" | Time in seconds after which sessions expire. Defaults to a day (24h). |
 | `SESSION_SAME_SITE` | "Lax" | SameSite attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite). Its value can be "None", "Lax" or "Strict". |
+| `SESSION_HTTP_ONLY` | `false` | HttpOnly attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#attributes). Its value can be "true" or "false". |
+| `SESSION_SECURE` | `false` | Secure attribute of the session cookie. Check details of SameSite attribute [here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#attributes). Its value can be "true" or "false". |
 | `SESSION_STORE_TYPE`| "boltdb" | Set `SESSION_STORE_TYPE` to either "boltdb" to use BoltDB as the session store, or "redis" to use redis as the session store. Note that only one of the two can be used, also if you select redis then depending on your redis configurations then you might need to set the password and the number of the database that OIDC-AuthService will use as a [redis-client](https://redis.uptrace.dev/guide/go-redis.html#connecting-to-redis-server).|
 | `SESSION_STORE_REDIS_ADDR`| "127.0.0.1:6379" | Set the `host:port` address for the redis session store. |
 | `SESSION_STORE_REDIS_PWD`| "" | Set the password to connect with the redis session store. |
