@@ -474,13 +474,13 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 	logger := common.RequestLogger(r, logModuleInfo)
 
 	// Revoke user session.
-	session, _, err := sessions.SessionFromRequest(r, s.store, sessions.UserSessionCookie, s.authHeader)
+	session, authMethod, err := sessions.SessionFromRequest(r, s.store, sessions.UserSessionCookie, s.authHeader)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if session.IsNew {
+	if authMethod == "" {
 		logger.Warn("Request doesn't have a valid session.")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
