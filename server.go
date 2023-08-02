@@ -66,6 +66,8 @@ type server struct {
 	userIdTransformer      common.UserIDTransformer
 	caBundle               []byte
 	sessionSameSite        http.SameSite
+	sessionHttpOnly        bool
+	sessionSecure          bool
 }
 
 // authenticate_or_login calls initiates the Authorization Code Flow if the user
@@ -400,6 +402,8 @@ func (s *server) callback(w http.ResponseWriter, r *http.Request) {
 	session.Options.Path = "/"
 	// Extra layer of CSRF protection
 	session.Options.SameSite = s.sessionSameSite
+	session.Options.HttpOnly = s.sessionHttpOnly
+	session.Options.Secure = s.sessionSecure
 
 	userID, ok := claims[s.idTokenOpts.UserIDClaim].(string)
 	if !ok {
@@ -469,22 +473,14 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
 	logger := common.RequestLogger(r, logModuleInfo)
 
-	// Only header auth allowed for this endpoint
-	sessionID := common.GetBearerToken(r.Header.Get(s.authHeader))
-	if sessionID == "" {
-		logger.Errorf("Request doesn't have a session value in header '%s'", s.authHeader)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	// Revoke user session.
-	session, err := sessions.SessionFromID(sessionID, s.store)
+	session, authMethod, err := sessions.SessionFromRequest(r, s.store, sessions.UserSessionCookie, s.authHeader)
 	if err != nil {
 		logger.Errorf("Couldn't get user session: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if session.IsNew {
+	if authMethod == "" {
 		logger.Warn("Request doesn't have a valid session.")
 		w.WriteHeader(http.StatusUnauthorized)
 		return

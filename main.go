@@ -218,6 +218,8 @@ func main() {
 		},
 		userIdTransformer:       c.UserIDTransformer,
 		sessionMaxAgeSeconds:    c.SessionMaxAge,
+		sessionHttpOnly:         c.SessionHttpOnly,
+		sessionSecure:           c.SessionSecure,
 		strictSessionValidation: c.StrictSessionValidation,
 		cacheEnabled:            c.CacheEnabled,
 		cacheExpirationMinutes:  c.CacheExpirationMinutes,
