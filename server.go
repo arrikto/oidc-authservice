@@ -469,16 +469,6 @@ func (s *server) logout(w http.ResponseWriter, r *http.Request) {
 
 	logger := common.RequestLogger(r, logModuleInfo)
 
-	// Only header auth allowed for this endpoint
-	//sessionID := common.GetBearerToken(r.Header.Get(s.authHeader))
-	//if sessionID == "" {
-	//	logger.Errorf("Request doesn't have a session value in header '%s'", s.authHeader)
-	//	w.WriteHeader(http.StatusUnauthorized)
-	//	return
-	//}
-
-	//sessions.SessionFromRequest(r, s.store, sessions.UserSessionCookie, s.authHeader)
-
 	// Revoke user session.
 	session, _, err := sessions.SessionFromRequest(r, s.store, sessions.UserSessionCookie, s.authHeader)
 	if err != nil {
