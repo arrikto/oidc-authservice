@@ -3,7 +3,7 @@ package authorizer
 import (
 	"net/http"
 
-	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/common"
 )
 
 type groupsAuthorizer struct {
@@ -16,7 +16,7 @@ func NewGroupsAuthorizer(allowlist []string) Authorizer {
 	}
 }
 
-func (ga *groupsAuthorizer) Authorize(r *http.Request, user *authenticator.User) (bool, string, error) {
+func (ga *groupsAuthorizer) Authorize(r *http.Request, user *common.User) (bool, string, error) {
 	authed, reason := ga.m.Match(user)
 	return authed, reason, nil
 }

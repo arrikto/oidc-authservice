@@ -8,18 +8,23 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
+	"time"
 
-	"github.com/arrikto/oidc-authservice/authenticator"
+	"github.com/arrikto/oidc-authservice/authenticators"
 	"github.com/arrikto/oidc-authservice/authorizer"
-	"github.com/arrikto/oidc-authservice/oidc"
-	"github.com/arrikto/oidc-authservice/svc"
+	"github.com/arrikto/oidc-authservice/common"
+	"github.com/arrikto/oidc-authservice/sessions"
+
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
+	"github.com/patrickmn/go-cache"
 	"github.com/tevino/abool"
-	"github.com/yosssi/boltstore/shared"
 )
 
-func newAuthorizer(c *config) authorizer.Authorizer {
+const CacheCleanupInterval = 10
+
+func newConfigOrGroupsAuthorizer(c *common.Config) authorizer.Authorizer {
+	log := common.StandardLogger()
+
 	if c.AuthzConfigPath != "" {
 		log.Infof("AuthzConfig file path=%s", c.AuthzConfigPath)
 		authz, err := authorizer.NewConfigAuthorizer(c.AuthzConfigPath)
@@ -35,19 +40,16 @@ func newAuthorizer(c *config) authorizer.Authorizer {
 }
 
 func main() {
+	log := common.StandardLogger()
 
-	c, err := parseConfig()
+	c, err := common.ParseConfig()
 	if err != nil {
 		log.Fatalf("Failed to parse configuration: %+v", err)
 	}
-
-	// set global log level
-	lvl, err := log.ParseLevel(c.LogLevel)
-	if err != nil {
-		log.Fatalf("Failed to parse LOG_LEVEL: %v", err)
-	}
-	log.SetLevel(lvl)
 	log.Infof("Config: %+v", c)
+
+	// Set log level
+	common.SetLogLevel(c.LogLevel)
 
 	// Start readiness probe immediately
 	log.Infof("Starting readiness probe at %v", c.ReadinessProbePort)
@@ -64,13 +66,14 @@ func main() {
 
 	// Register handlers for routes
 	router := mux.NewRouter()
-	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, OIDCCallbackPath), s.callback).Methods(http.MethodGet)
+	router.HandleFunc(c.RedirectURL.Path, s.callback).Methods(http.MethodGet)
 	router.HandleFunc(path.Join(c.AuthserviceURLPrefix.Path, SessionLogoutPath), s.logout).Methods(http.MethodPost)
 
-	router.PathPrefix("/").Handler(whitelistMiddleware(c.SkipAuthURLs, isReady)(http.HandlerFunc(s.authenticate)))
+	router.PathPrefix(c.VerifyAuthURL.Path).Handler(s.whitelistMiddleware(c.SkipAuthURLs, isReady, true)(http.HandlerFunc(s.authenticate_no_login))).Methods(http.MethodGet)
+	router.PathPrefix("/").Handler(s.whitelistMiddleware(c.SkipAuthURLs, isReady, false)(http.HandlerFunc(s.authenticate_or_login)))
 
-	// Start server
-	log.Infof("Starting server at %v:%v", c.Hostname, c.Port)
+	// Start judge server
+	log.Infof("Starting judge server at %v:%v", c.Hostname, c.Port)
 	stopCh := make(chan struct{})
 	go func(stopCh chan struct{}) {
 		log.Fatal(http.ListenAndServe(fmt.Sprintf("%s:%d", c.Hostname, c.Port), router))
@@ -82,7 +85,7 @@ func main() {
 		TemplatePaths: c.TemplatePath,
 		ProviderURL:   c.ProviderURL.String(),
 		ClientName:    c.ClientName,
-		ThemeURL:      resolvePathReference(c.ThemesURL, c.Theme).String(),
+		ThemeURL:      common.ResolvePathReference(c.ThemesURL, c.Theme).String(),
 		Frontend:      c.UserTemplateContext,
 	}
 	log.Infof("Starting web server at %v:%v", c.Hostname, c.WebServerPort)
@@ -103,43 +106,25 @@ func main() {
 		}
 	}
 
-	// Setup session store
-	// Using BoltDB by default
-	store, err := newBoltDBSessionStore(c.SessionStorePath,
-		shared.DefaultBucketName, false)
-	if err != nil {
-		log.Fatalf("Error creating session store: %v", err)
-	}
-	defer store.Close()
+	// Setup session store and state store using the configured session store
+	// type (BoltDB, or redis)
+	store, oidcStateStore := sessions.InitiateSessionStores(c)
 
-	// Setup state store
-	// Using BoltDB by default
-	oidcStateStore, err := newBoltDBSessionStore(c.OIDCStateStorePath,
-		"oidc_state", true)
-	if err != nil {
-		log.Fatalf("Error creating oidc state store: %v", err)
-	}
+	defer store.Close()
 	defer oidcStateStore.Close()
 
-	enabledAuthenticators := map[string]bool{}
-	for _, authenticator := range c.Authenticators {
-		enabledAuthenticators[authenticator] = true
+	// Get Kubernetes authenticator
+	k8sAuthenticator, err := authenticators.NewKubernetesAuthenticator(c.Audiences)
+	if err != nil && c.KubernetesAuthnEnabled {
+		log.Fatalf("Error creating K8s authenticator: %v", err)
+	} else {
+		// If Kubernetes authenticator is disabled, ignore the error.
+		log.Debugf("%v. Kubernetes authenticator is disabled, skipping ...", err)
 	}
 
-	authenticators := []authenticator.Authenticator{}
+	tlsCfg := common.TlsConfig(caBundle)
 
-	if enabledAuthenticators["kubernetes"] {
-		k8sAuthenticator, err := authenticator.NewKubernetesAuthenticator(c.Audiences)
-		if err != nil {
-			log.Fatalf("Error creating K8s authenticator: %v", err)
-		}
-
-		authenticators = append(authenticators, k8sAuthenticator)
-	}
-
-	tlsCfg := svc.TlsConfig(caBundle)
-
-	sessionManager := oidc.NewSessionManager(
+	sessionManager := sessions.NewSessionManager(
 		tlsCfg.Context(context.Background()),
 		c.ClientID,
 		c.ClientSecret,
@@ -149,38 +134,58 @@ func main() {
 		c.OIDCScopes,
 	)
 
-	sessionStore := oidc.NewSessionStore(
+	// Setup authenticators.
+	sessionAuthenticator := authenticators.NewSessionAuthenticator(
 		store,
-		c.AuthHeader,
-		oidc.UserSessionCookie,
-		c.SessionDomain,
-		c.UserIDClaim,
-		c.GroupsClaim,
-		c.SessionMaxAge,
-		c.SessionSameSite,
+		sessions.UserSessionCookie,
+		c.TokenHeader,
+		c.TokenScheme,
+		c.StrictSessionValidation,
+		tlsCfg,
+		sessionManager,
 	)
 
-	if enabledAuthenticators["session"] {
-		sessionAuthenticator := authenticator.NewSessionAuthenticator(
-			sessionStore,
-			c.TokenHeader,
-			c.TokenScheme,
-			c.StrictSessionValidation,
-			tlsCfg,
-			sessionManager,
-		)
-		authenticators = append(authenticators, sessionAuthenticator)
-	}
+	idTokenAuthenticator := authenticators.NewIDTokenAuthenticator(
+		c.IDTokenHeader,
+		c.UserIDClaim,
+		c.GroupsClaim,
+		tlsCfg,
+		sessionManager,
+	)
 
-	if enabledAuthenticators["idtoken"] {
-		idTokenAuthenticator := authenticator.NewIdTokenAuthenticator(
-			c.IDTokenHeader,
-			c.UserIDClaim,
-			c.GroupsClaim,
-			sessionManager,
-			tlsCfg,
-		)
-		authenticators = append(authenticators, idTokenAuthenticator)
+	jwtTokenAuthenticator := authenticators.NewJWTTokenAuthenticator(
+		c.IDTokenHeader,
+		c.Audiences,
+		c.ProviderURL.String(),
+		c.UserIDClaim,
+		c.GroupsClaim,
+		tlsCfg,
+		sessionManager,
+	)
+
+	opaqueTokenAuthenticator := authenticators.NewOpaqueTokenAuthenticator(
+		c.IDTokenHeader,
+		c.UserIDClaim,
+		c.GroupsClaim,
+		tlsCfg,
+		sessionManager,
+	)
+
+	// Set the bearerUserInfoCache cache to store
+	// the (Bearer Token, UserInfo) pairs.
+	bearerUserInfoCache := cache.New(time.Duration(c.CacheExpirationMinutes)*time.Minute, time.Duration(CacheCleanupInterval)*time.Minute)
+
+	// Configure the authorizers.
+	var authorizers []authorizer.Authorizer
+
+	// Add the config or groups authorizer.
+	configOrGroupsAuthorizer := newConfigOrGroupsAuthorizer(c)
+	authorizers = append(authorizers, configOrGroupsAuthorizer)
+
+	// Add the external authorizer.
+	if c.ExternalAuthzUrl != "" {
+		externalAuthorizer := authorizer.ExternalAuthorizer{c.ExternalAuthzUrl}
+		authorizers = append(authorizers, externalAuthorizer)
 	}
 
 	// Set the server values.
@@ -188,30 +193,61 @@ func main() {
 
 	*s = server{
 		// TODO: Add support for Redis
-		sessionStore: sessionStore,
-		oidcStateStore: oidc.NewOidcStateStore(
-			oidcStateStore,
-			c.SessionDomain,
-		),
+		store:                  store,
+		oidcStateStore:         oidcStateStore,
+		bearerUserInfoCache:    bearerUserInfoCache,
 		afterLoginRedirectURL:  c.AfterLoginURL.String(),
 		homepageURL:            c.HomepageURL.String(),
 		afterLogoutRedirectURL: c.AfterLogoutURL.String(),
+		verifyAuthURL:          c.VerifyAuthURL.String(),
+		idTokenOpts: common.JWTClaimOpts{
+			UserIDClaim: c.UserIDClaim,
+			GroupsClaim: c.GroupsClaim,
+		},
 		userHeaderHelper: newUserHeaderHelper(
-			httpHeaderOpts{
-				userIDHeader: c.UserIDHeader,
-				userIDPrefix: c.UserIDPrefix,
-				groupsHeader: c.GroupsHeader,
+			common.HTTPHeaderOpts{
+				UserIDHeader:     c.UserIDHeader,
+				UserIDPrefix:     c.UserIDPrefix,
+				GroupsHeader:     c.GroupsHeader,
+				AuthMethodHeader: c.AuthMethodHeader,
 			},
 			&c.UserIDTransformer,
 		),
-		authenticators: authenticators,
-		authorizers:    []authorizer.Authorizer{newAuthorizer(c)},
+		sessionMaxAgeSeconds:   c.SessionMaxAge,
+		cacheEnabled:           c.CacheEnabled,
+		cacheExpirationMinutes: c.CacheExpirationMinutes,
+
+		IDTokenAuthnEnabled:     c.IDTokenAuthnEnabled,
+		KubernetesAuthnEnabled:  c.KubernetesAuthnEnabled,
+		AccessTokenAuthnEnabled: c.AccessTokenAuthnEnabled,
+		AccessTokenAuthn:        c.AccessTokenAuthn,
+		authenticators: []authenticators.Authenticator{
+			k8sAuthenticator,
+			opaqueTokenAuthenticator,
+			jwtTokenAuthenticator,
+			sessionAuthenticator,
+			idTokenAuthenticator,
+		},
+		authorizers:    authorizers,
 		tlsCfg:         tlsCfg,
 		sessionManager: sessionManager,
+		sessionDomain:  c.SessionDomain,
+	}
+	switch c.SessionSameSite {
+	case "None":
+		s.sessionSameSite = http.SameSiteNoneMode
+	case "Strict":
+		s.sessionSameSite = http.SameSiteStrictMode
+	default:
+		// Use Lax mode as the default
+		s.sessionSameSite = http.SameSiteLaxMode
 	}
 
-	s.newState = oidc.NewStateFunc(
-		&oidc.Config{
+	// Print server configuration info
+	log.Infof("Cache enabled: %t", s.cacheEnabled)
+
+	s.newState = sessions.NewStateFunc(
+		&sessions.Config{
 			SessionDomain: c.SessionDomain,
 			SchemeDefault: c.SchemeDefault,
 			SchemeHeader:  c.SchemeHeader,

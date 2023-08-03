@@ -1,4 +1,4 @@
-package svc
+package common
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ func (e *RequestError) Unwrap() error {
 
 var _ error = &LoginExpiredError{}
 
-// LoginExpiredError is used by authenticators to inform the calling code
+// loginExpiredError is used by authenticators to inform the calling code
 // that the provided credentials were recognized but the login has expired
 type LoginExpiredError struct {
 	Err error
@@ -35,5 +35,21 @@ func (e *LoginExpiredError) Error() string {
 }
 
 func (e *LoginExpiredError) Unwrap() error {
+	return e.Err
+}
+
+// The AuthenticatorSpecificError type is used to inform the calling code
+// that the appropriate authentication method failed to authenticate the
+// request.
+// No other authentication method needs to be tested.
+type AuthenticatorSpecificError struct {
+	Err error
+}
+
+func (e *AuthenticatorSpecificError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *AuthenticatorSpecificError) Unwrap() error {
 	return e.Err
 }

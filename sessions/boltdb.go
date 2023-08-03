@@ -1,9 +1,9 @@
-package main
+package sessions
 
 import (
 	"os"
-	"path/filepath"
 
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/boltdb/bolt"
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/gorilla/sessions"
@@ -11,23 +11,6 @@ import (
 	"github.com/yosssi/boltstore/reaper"
 	boltstore "github.com/yosssi/boltstore/store"
 )
-
-const (
-	// Issue: https://github.com/gorilla/sessions/issues/200
-	secureCookieKeyPair = "notNeededBecauseCookieValueIsRandom"
-)
-
-func realpath(path string) (string, error) {
-	path, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	path, err = filepath.EvalSymlinks(path)
-	if err != nil {
-		return "", err
-	}
-	return path, nil
-}
 
 type boltDBSessionStore struct {
 	sessions.Store
@@ -58,7 +41,7 @@ func newBoltDBSessionStore(path, bucket string, allowDBReuse bool) (*boltDBSessi
 	// Get realpath if the file already exists
 	_, err := os.Stat(path)
 	if !os.IsNotExist(err) {
-		path, err = realpath(path)
+		path, err = common.RealPath(path)
 		if err != nil {
 			return nil, err
 		}

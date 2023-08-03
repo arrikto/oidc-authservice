@@ -11,10 +11,9 @@ IMG ?= gcr.io/arrikto-playground/kubeflow/oidc-authservice
 TAG ?= $(GIT_VERSION)
 
 .EXPORT_ALL_VARIABLES:
-DOCKER_BUILDKIT		:= 1
-GO111MODULE			:= on
-PATH				:= $(CURDIR)/bin/deps:$(CURDIR)/bin/deps/go/bin:$(PATH)
-GOROOT				:= $(CURDIR)/bin/deps/go
+DOCKER_BUILDKIT := 1
+PATH := $(CURDIR)/bin/deps:$(CURDIR)/bin/deps/go/bin:$(PATH)
+GOROOT := $(CURDIR)/bin/deps/go
 
 
 all: build

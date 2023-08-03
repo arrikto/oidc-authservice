@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/arrikto/oidc-authservice/logger"
+	"github.com/arrikto/oidc-authservice/common"
 	"github.com/gorilla/mux"
 )
 
@@ -17,9 +17,7 @@ const (
 )
 
 var (
-	HomepagePath    = "/site/homepage"
-	AfterLogoutPath = "/site/after_logout"
-	ThemesPath      = "/site/themes"
+	ThemesPath = "/site/themes"
 )
 
 type WebServer struct {
@@ -47,7 +45,7 @@ func (s *WebServer) Start(addr string) error {
 	// Add functions to context
 	funcs := map[string]interface{}{
 		"resolve_url_ref": func(url, ref string) string {
-			return mustParseURL(url).ResolveReference(mustParseURL(ref)).String()
+			return common.MustParseURL(url).ResolveReference(common.MustParseURL(ref)).String()
 		},
 	}
 
@@ -71,8 +69,8 @@ func (s *WebServer) Start(addr string) error {
 		ThemeURL:    s.ThemeURL,
 		ClientName:  s.ClientName,
 	}
-	router.HandleFunc(HomepagePath, siteHandler(templates.Lookup(tmplLanding), data)).Methods(http.MethodGet)
-	router.HandleFunc(AfterLogoutPath, siteHandler(templates.Lookup(tmplAfterLogout), data)).Methods(http.MethodGet)
+	router.HandleFunc(common.HomepagePath, siteHandler(templates.Lookup(tmplLanding), data)).Methods(http.MethodGet)
+	router.HandleFunc(common.AfterLogoutPath, siteHandler(templates.Lookup(tmplAfterLogout), data)).Methods(http.MethodGet)
 
 	// Themes
 	router.
@@ -90,7 +88,7 @@ func (s *WebServer) Start(addr string) error {
 // siteHandler returns an http.HandlerFunc that serves a given template
 func siteHandler(tmpl *template.Template, data interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logger.ForRequest(r)
+		logger := common.RequestLogger(r, "web server")
 		if err := tmpl.Execute(w, data); err != nil {
 			logger.Errorf("Error executing template: %v", err)
 		}
