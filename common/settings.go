@@ -196,10 +196,14 @@ func validSessionStoreType(SessionStoreType string) (bool){
 	if SessionStoreType == "redis"{
 		return true
 	}
+	if SessionStoreType == "redisfailover"{
+		return true
+	}
 
 	log.Warn("Please select exactly one of the options: " +
 	"i) boltdb: to select the BoltDB supported session store, " +
-	"ii) redis: to select the Redis supported session store")
+	"ii) redis: to select the Redis supported session store, " +
+	"iiI) redisfailver: to select the RedisFailover supported session store")
 
 	return false
 }

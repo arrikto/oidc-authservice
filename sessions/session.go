@@ -172,6 +172,17 @@ func InitiateSessionStores(c *common.Config) (ClosableStore, ClosableStore) {
 		if err != nil {
 			logger.Fatalf("Error creating session store: %v", err)
 		}
+	case "redisfailover":
+		// Setup session store
+		store, err = newRedisFailoverSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "", c.SessionStoreRedisDB)
+		if err != nil {
+			logger.Fatalf("Error creating session store: %v", err)
+		}
+		// Setup state store
+		oidcStateStore, err = newRedisFailoverSessionStore(c.SessionStoreRedisAddr, c.SessionStoreRedisPWD, "oidc_state:", c.SessionStoreRedisDB)
+		if err != nil {
+			logger.Fatalf("Error creating session store: %v", err)
+		}
 	default:
 		logger.Fatalf("Unsupported session store type: %s", c.SessionStoreType)
 	}
